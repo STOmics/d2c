@@ -10,6 +10,7 @@ libdeflatePath="$libPath/libdeflate-1.5"
 htslibPath="$libPath/htslib-1.9"
 yggPath="$libPath/ygg-master"
 doctestPath="$libPath/doctest-2.3.7"
+taskflowPath="$libPath/taskflow-2.5.0"
 
 binPath="/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/bin"
 export PATH="$gccPath/bin:$cmakePath/bin:$binPath"
@@ -24,6 +25,7 @@ export C_INCLUDE_PATH="$doctestPath/include:$C_INCLUDE_PATH"
 export C_INCLUDE_PATH="$libdeflatePath/include:$yggPath/include:$C_INCLUDE_PATH"
 export C_INCLUDE_PATH="$htslibPath/include:$gccPath/include:$C_INCLUDE_PATH"
 export C_INCLUDE_PATH="$CLI11Path/include:$spdlogPath/include:$C_INCLUDE_PATH"
+export C_INCLUDE_PATH="$taskflowPath/include:$C_INCLUDE_PATH"
 export CPLUS_INCLUDE_PATH=$C_INCLUDE_PATH
 #echo $C_INCLUDE_PATH
 
@@ -75,6 +77,10 @@ cmake $srcPath -DINSTALL_PATH=$installPath -DUNITTEST=$test
 
 thread=$(grep -c ^processor /proc/cpuinfo)
 make -j $thread #VERBOSE=1
+if [ $? != 0 ]
+then
+    exit 1
+fi
 
 
 #cp $buildPath/bin/handleBam $installPath/bin
@@ -102,6 +108,15 @@ install(){
 
 install $htslibPath/lib/libhts.so.2
 install $libdeflatePath/lib/libdeflate.so.0
+
+# Copy reference data
+if [ -e "$installPath/bin/anno" ]
+then
+    echo "Reference data exists"
+else
+    cp -R anno $installPath/bin/
+    echo "Installing: reference data"
+fi
 
 timeEnd=$(date +%s)
 secs=$(($timeEnd - $timeStart))
