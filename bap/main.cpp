@@ -97,9 +97,12 @@ int main(int argc, char** argv)
     if (supported_genomes.count(ref) != 0)
     {
         cout<<"Found designated reference genome:"<<ref<<endl;
-        trans_file = ref_path/"TSS"/(ref+".refGene.TSS.bed");
-        blacklist_file = ref_path/"blacklist"/(ref+".full.blacklist.bed");
-        bed_genome_file = ref_path/"bedtools"/("chrom_"+ref+".sizes");
+        if (trans_file.empty())
+            trans_file = ref_path/"TSS"/(ref+".refGene.TSS.bed");
+        if (blacklist_file.empty())
+            blacklist_file = ref_path/"blacklist"/(ref+".full.blacklist.bed");
+        if (bed_genome_file.empty())
+            bed_genome_file = ref_path/"bedtools"/("chrom_"+ref+".sizes");
     }
     else
     {
@@ -111,6 +114,7 @@ int main(int argc, char** argv)
             exit(1);
         }
     }
+    
     // Make sure mito chr is valid
     if (mito_chr.empty())
     {
@@ -122,6 +126,15 @@ int main(int argc, char** argv)
             mito_chr = "humanM";
         else
             mito_chr = "hg19_chrM";
+    }
+    // Check the output path is valid
+    if (!fs::exists(output_path))
+    {
+        if (!fs::create_directories(fs::path(output_path)))
+        {
+            cout<<"Failed to create directory: "<<output_path<<endl;
+            exit(1);
+        }
     }
 
     // Devel
@@ -160,7 +173,7 @@ int main(int argc, char** argv)
         std::cout << "Log init failed: " << ex.what() << std::endl;
     }
     spdlog::set_level(spdlog::level::debug);  // Set global log level.
-    spdlog::flush_on(spdlog::level::info);
+    spdlog::flush_on(spdlog::level::debug);
     spdlog::set_pattern("%Y-%m-%d %H:%M:%S.%e %L %n: %v");
 
     spdlog::get("main")->info("{} input_bam:{} output_path:{} barcode_tag:{} "
@@ -173,10 +186,10 @@ int main(int argc, char** argv)
 
     Bap bap = Bap(input_bam, output_path, barcode_tag, mapq, cores, run_name, tn5,
         min_barcode_frags, min_jaccard_index, ref, mito_chr, bed_genome_file,
-        blacklist_file, trans_file, species_mix);
+        blacklist_file, trans_file, species_mix, exe_path.string());
     try
     {
-        bap.taskflow();
+        bap.run();
     }
     catch (std::exception& e)
     {

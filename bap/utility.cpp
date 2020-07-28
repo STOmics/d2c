@@ -11,6 +11,16 @@
 #include <sstream>
 #include <iomanip>
 
+#include <string.h>
+#ifdef _WIN32
+#include <direct.h>
+#define popen _popen
+#define pclose _pclose
+#else
+#include <sys/sysinfo.h>
+#include <unistd.h>
+#endif
+
 vector<string> split_str(const std::string& str, char delim, bool skip_empty)
 {
     std::istringstream iss(str);
@@ -36,4 +46,33 @@ string f2str(float f, int bits)
     stringstream ss; 
     ss << fixed << setprecision(bits) << f; 
     return ss.str();
+}
+
+int exec_shell(const char* cmd, std::vector< std::string >& resvec)
+{
+    resvec.clear();
+    FILE* pp = popen(cmd, "r");  // make pipe
+    if (!pp)
+    {
+        return -1;
+    }
+    char tmp[1024];  // store the stdout per line
+    while (fgets(tmp, sizeof(tmp), pp) != NULL)
+    {
+        if (tmp[strlen(tmp) - 1] == '\n')
+        {
+            tmp[strlen(tmp) - 1] = '\0';
+        }
+        resvec.push_back(tmp);
+    }
+
+    // close pipe, the return code is cmd's status
+    // returns the exit status of the terminating command processor
+    // -1 if an error occurs
+    int rtn = pclose(pp);
+#ifndef _WIN32
+    rtn = WEXITSTATUS(rtn);
+#endif
+
+    return rtn;
 }

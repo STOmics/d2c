@@ -18,3 +18,6 @@ vector<string> split_str(const std::string& str, char delim=' ', bool skip_empty
 float round(float src, int bits);
 
 string f2str(float f, int bits);
+
+// For executing shell script
+int exec_shell(const char* cmd, std::vector< std::string >& resvec);

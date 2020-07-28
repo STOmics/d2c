@@ -73,10 +73,10 @@ then
     fi
 fi
 
-cmake $srcPath -DINSTALL_PATH=$installPath -DUNITTEST=$test
+cmake $srcPath -DINSTALL_PATH=$installPath -DUNITTEST=$test -DCMAKE_INSTALL_PREFIX=$installPath
 
 thread=$(grep -c ^processor /proc/cpuinfo)
-make -j $thread #VERBOSE=1
+make -j $thread install #VERBOSE=1
 if [ $? != 0 ]
 then
     exit 1
