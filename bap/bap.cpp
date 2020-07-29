@@ -302,6 +302,7 @@ int Bap::taskflow()
     // Step 5: reannotate frag data and get summary stats by chr
     _keep_qnames.resize(contigs.size());
     _dup_frags.resize(contigs.size());
+    _frag_stats.resize(contigs.size());
     auto [start_reanno, end_reanno] = taskflow.parallel_for(
         0,
         int(contigs.size()),
@@ -360,8 +361,81 @@ int Bap::taskflow()
     merge_bam.succeed(end_annobam);
 
     // Step 8: merge fragment files
-    auto simple_qc = taskflow.emplace([] ()
+    auto merge_frags = taskflow.emplace([&] ()
     {
+        for (int chr_id = 0; chr_id < contigs.size(); ++chr_id)
+        {
+            if (used_chrs.count(chr_id) == 0) continue;
+            _final_frags.insert(_final_frags.end(), _dup_frags[chr_id].begin(), _dup_frags[chr_id].end());
+            _dup_frags[chr_id].clear();
+            _dup_frags[chr_id].shrink_to_fit();
+        }
+        fs::path out_frag_file = output_path / (run_name+".fragment.tsv");
+        FILE* out_frag;
+        out_frag = fopen(out_frag_file.c_str(), "w");
+        char new_line = '\n';
+        for (auto& l : _final_frags)
+        {
+            fwrite(l.c_str(), 1, l.size(), out_frag);
+            fwrite(&new_line, 1, 1, out_frag);
+        }
+        fclose(out_frag);
+        std::cout<<"merge frags"<<std::endl;
+    }).name("Merge fragments");
+    merge_frags.succeed(end_reanno);
+
+    // Step 9: simple qc
+    auto simple_qc = taskflow.emplace([&] ()
+    {
+        map<string, pair<int,int>> nuclear;
+        int mito_pos = -1;
+        for (int chr_id = 0; chr_id < contigs.size(); ++chr_id)
+        {
+            if (used_chrs.count(chr_id) == 0) continue;
+            cout<<"contig name: "<<chr_id<<" "<<_contig_names[chr_id]<<" "<<mito_chr<<endl;
+            if (_contig_names[chr_id] == mito_chr)
+            {
+                mito_pos = chr_id;
+                continue;
+            }
+
+            for (auto& p : _frag_stats[chr_id])
+            {
+                nuclear[p.first].first += p.second.first;
+                nuclear[p.first].second += p.second.second;
+            }
+            _frag_stats[chr_id].clear();
+        }
+        assert(mito_pos != -1);
+        auto& mito = _frag_stats[mito_pos];
+        map<string, pair<int,int>>::iterator it;
+        for (auto& p : mito)
+        {
+            it = nuclear.find(p.first);
+            if (it == nuclear.end()) continue;
+
+            SumStat ss;
+            ss.drop_barcode = p.first;
+            ss.nuclear_total = it->second.first;
+            ss.nuclear_uniq = it->second.second;
+            ss.mito_total = p.second.first;
+            ss.mito_uniq = p.second.second;
+            _sum_stats.push_back(ss);
+        }
+
+        fs::path out_ss_file = output_path / (run_name+".basicQC.tsv");
+        FILE* out_ss;
+        out_ss = fopen(out_ss_file.c_str(), "w");
+        string header = "cell_barcode\ttotalNuclearFrags\tuniqueNuclearFrags\ttotalMitoFrags\tuniqueMitoFrags\n";
+        fwrite(header.c_str(), 1, header.size(), out_ss);
+        for (auto& l : _sum_stats)
+        {
+            string s = l.drop_barcode+'\t'+to_string(l.nuclear_total)+'\t'+to_string(l.nuclear_uniq)+'\t'+
+                        to_string(l.mito_total)+'\t'+to_string(l.mito_uniq)+'\n';
+            fwrite(s.c_str(), 1, s.size(), out_ss);
+        }
+        fclose(out_ss);
+
         std::cout<<"Simple qc"<<std::endl;
     }).name("Simple qc");
     simple_qc.succeed(end_reanno);
@@ -926,7 +1000,7 @@ int Bap::reannotateFragByChr(int chr_id)
     set<string> pcr_dup;
     set<string> qname_dup;
     // Store n_total and n_unique as pair
-    map<string, pair<int, int>> merge_ss;
+    map<string, pair<int, int>>& merge_ss = _frag_stats[chr_id];
     string chr = _contig_names[chr_id];
     auto& frags_data = _bedpes_by_chr[chr_id];
     map<string, string>::iterator it;
@@ -956,6 +1030,10 @@ int Bap::reannotateFragByChr(int chr_id)
     dup_keys.swap(_dup_frags[chr_id]);
 
     pcr_dup.clear();
+    // Release the memory
+    
+    _bedpes_by_chr[chr_id].clear();
+    _bedpes_by_chr[chr_id].shrink_to_fit();
 
     cout<<"chr "<<chr_id<<" keep_qname size: "<<_keep_qnames[chr_id].size()<<" dup_frags size: "<<_dup_frags[chr_id].size()<<endl;
 

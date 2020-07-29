@@ -29,6 +29,14 @@ struct Bedpe
     string barcode;
 };
 
+struct SumStat
+{
+    string drop_barcode;
+    int nuclear_total;
+    int nuclear_uniq;
+    int mito_total;
+    int mito_uniq;
+};
 
 class Bap
 {
@@ -83,5 +91,8 @@ private:
     map<string, string> _drop_barcodes;
     vector<string> _contig_names;
     vector<vector<string>> _dup_frags;
+    vector<string> _final_frags;
     vector<set<string>> _keep_qnames;
+    vector<map<string, pair<int, int>>> _frag_stats;
+    vector<SumStat> _sum_stats;
 };
