@@ -90,6 +90,50 @@ inline bool isReverse(BamRecord b)
     return b->core.flag & BAM_FREVERSE;
 }
 
+struct SummaryData
+{
+    int overlaps; // The number of has overlap with TSS
+    float tss_proportion; // overlaps / total
+    float mean_insert_size;
+    int median_insert_size;
+    float frip;   // The mean value of peak
+    vector<int> insert_size;
+};
+
+float get_dup_proportion(int t, int u)
+{
+    return (t-u)*1.0 / t;
+}
+
+inline float aux(float x, int c, int n)
+{
+    return (c / x - 1 + exp(-n / x));
+}
+int get_library_size(int t, int u)
+{
+    float m = 1;
+    float M = 100;
+    int n_dup = t - u + 1;
+    if (u > t || aux(m*u, u, t) < 0 || u < 0 || t < 0 || n_dup < 0)
+        return 0;
+
+    while (aux(M*u, u, t) > 0)
+        M *= 10.0;
+    
+    for (int i = 0; i <= 40; ++i)
+    {
+        float mid = (m + M) / 2;
+        float v = aux(mid * u, u, t);
+        if ( v == 0 )
+            break;
+        else if (v > 0)
+            m = mid;
+        else
+            M = mid;
+    }
+    return round(u*(m+M)/2.0);
+}
+
 void Bap::extractBedPE(const BamRecord b1, const BamRecord b2, vector<Bedpe>& bedpes)
 {
     // Initialize BEDPE variables
@@ -401,6 +445,7 @@ int Bap::taskflow()
 
             for (auto& p : _frag_stats[chr_id])
             {
+                if (p.second.first == 0 || p.second.second == 0) continue;
                 nuclear[p.first].first += p.second.first;
                 nuclear[p.first].second += p.second.second;
             }
@@ -411,6 +456,7 @@ int Bap::taskflow()
         map<string, pair<int,int>>::iterator it;
         for (auto& p : mito)
         {
+            if (p.second.first == 0 || p.second.second == 0) continue;
             it = nuclear.find(p.first);
             if (it == nuclear.end()) continue;
 
@@ -439,6 +485,25 @@ int Bap::taskflow()
         std::cout<<"Simple qc"<<std::endl;
     }).name("Simple qc");
     simple_qc.succeed(end_reanno);
+
+    // Step 10: final qc
+    auto final_qc = taskflow.emplace([&] ()
+    {
+        Bap::finalQC();
+        std::cout<<"Final qc"<<std::endl;
+    }).name("Final qc");
+    final_qc.succeed(barcode_merge);
+    final_qc.succeed(simple_qc);
+    final_qc.succeed(merge_frags);
+
+    // Step 11: plot
+    auto plot = taskflow.emplace([&] ()
+    {
+        Bap::plot();
+        std::cout<<"Plot"<<std::endl;
+    }).name("Plot");
+    plot.succeed(barcode_merge);
+    plot.succeed(determine_hq_beads);
 
     executor.run(taskflow).wait();
 
@@ -605,13 +670,15 @@ map<string, string> Bap::parseChrsFromBedFile()
     return chrs;
 }
 
-double Bap::parseBeadThreshold(string filename)
+pair<double, double> Bap::parseBeadThreshold(string filename)
 {
+    pair<double, double> res;
     ifstream ifs(filename, std::ifstream::in);
     string line;
     std::getline(ifs, line);
-    double res = 0.0;
-    if (!line.empty()) res = stod(line);
+    if (!line.empty()) res.first = stod(line);
+    std::getline(ifs, line);
+    if (!line.empty()) res.second = stod(line);
     ifs.close();
     return res;
 }
@@ -621,7 +688,7 @@ int Bap::determineHQBeads()
     // Dump total bead quant to csv for call R script
     FILE * out_bead_quant;
     fs::path filename = output_path;
-    filename /= "barcodeQuantSimple.csv"; 
+    filename /= (run_name+".barcodeQuantSimple.csv"); 
     spdlog::debug("Dump bead quant to:{}", filename.string());
     out_bead_quant = fopen(filename.c_str(), "w");
     for (auto& b : _total_bead_quant)
@@ -650,8 +717,15 @@ int Bap::determineHQBeads()
     }
 
     // Define the set of high-quality bead barcodes
-    double bead_threshold = parseBeadThreshold(filename.string()+"_kneeValue.txt");
+    auto paras = parseBeadThreshold(filename.string()+"_kneeValue.txt");
+    double bead_threshold = paras.first, call_threshold = paras.second;
 
+    fs::path paras_file = output_path / (run_name+".bapParam.csv");
+    ofstream ofs(paras_file.string(), std::ofstream::out);
+    ofs << "bead_threshold_nosafety,"<<call_threshold<<endl;
+    ofs << "bead_threshold,"<<bead_threshold<<endl;
+    ofs.close();
+				
     // Devel
     //bead_threshold = 0;
 
@@ -828,6 +902,8 @@ int Bap::determineBarcodeMerge()
         return a.second > b.second;
     });
 
+    fs::path paras_file = output_path / (run_name+".bapParam.csv");
+    ofstream ofs(paras_file.string(), std::ofstream::out | std::ofstream::app);
     // Call knee if we need to
     if (min_jaccard_index == 0.0)
     {
@@ -849,11 +925,15 @@ int Bap::determineBarcodeMerge()
 
         // // Define the set of high-quality bead barcodes
         // double bead_threshold = parseBeadThreshold(filename.string()+"_kneeValue.txt");
+
+        ofs << "bead_threshold_nosafety,"<<min_jaccard_index<<endl;
     }
+    ofs << "jaccard_threshold,"<<min_jaccard_index<<endl;
+    ofs.close();
 
     // Export the implicated barcodes
     FILE * tbl_out;
-    fs::path implicated_barcode_file = output_path / "implicatedBarcodes.csv"; 
+    fs::path implicated_barcode_file = output_path / (run_name+".implicatedBarcodes.csv"); 
     tbl_out = fopen(implicated_barcode_file.c_str(), "w");
     string header = "barc1,barc2,N_both,N_barc1,N_barc2,jaccard_frag,merged\n";
     fwrite(header.c_str(), 1, header.size(), tbl_out);
@@ -944,7 +1024,7 @@ int Bap::determineBarcodeMerge()
     }
     
     FILE * bt;
-    fs::path barcode_translate_file = output_path / "barcodeTranslate.tsv";
+    fs::path barcode_translate_file = output_path / (run_name+".barcodeTranslate.tsv");
     bt = fopen(barcode_translate_file.c_str(), "w");
     for (auto& p : _drop_barcodes)
     {
@@ -964,7 +1044,7 @@ int Bap::determineBarcodeMerge()
     _total_nc_cnts.clear();
 
     FILE * nc_file_out;
-    fs::path nc_sum_file = output_path / "NCsumstats.tsv";
+    fs::path nc_sum_file = output_path / (run_name+".NCsumstats.tsv");
     nc_file_out = fopen(nc_sum_file.c_str(), "w");
     header = "NC_value\tNumberOfFragments\n";
     fwrite(header.c_str(), 1, header.size(), nc_file_out);
@@ -1100,6 +1180,145 @@ int Bap::annotateBamByChr(int chr_id)
    
     bam_destroy1(b);
     hts_close(out);
+
+    return 0;
+}
+
+int Bap::finalQC()
+{
+    // Load tss file for finding overlaps
+    ifstream tss_ifs(trans_file, std::ifstream::in);
+    string line;
+    vector<Node> nodes;
+    while (std::getline(tss_ifs, line))
+    {
+        vector<string> vec_s = split_str(line, '\t');
+        if (vec_s.size() < 3) continue;
+
+        Node node;
+        node.lower = stoi(vec_s[1]) - 1000;
+        node.upper = stoi(vec_s[2]) + 1000;
+        node.value = vec_s[0];
+        nodes.push_back(std::move(node));
+    }
+
+    map<string, MyTree> mytrees;
+    for (auto& node : nodes)
+    {
+        mytrees[node.value].insert(node);
+    }
+
+    // Store has_overlap and insert size as pair
+    map<string, SummaryData> summary;
+    
+    for (auto& l : _final_frags)
+    {
+        vector<string> vec_s = split_str(l, '\t');
+        if (vec_s.size() < 4) continue;
+
+        string chr = vec_s[0];
+        int start = stoi(vec_s[1]);
+        int end = stoi(vec_s[2]);
+        MyInterval query_range {start, end};
+        auto& sd = summary[vec_s[3]];
+        if (mytrees.count(chr) != 0)
+        {
+            const auto& tree = mytrees.at(chr);
+            const auto& res = tree.query(query_range);
+            
+            if (res.begin() != res.end())
+                ++sd.overlaps;
+        }
+        int insert_size = end - start;
+        sd.insert_size.push_back(insert_size);
+    }
+    mytrees.clear();
+
+    // Deal with FRIP if we have a peak file
+    if (peak_file != "")
+    {
+        // TODO(fxzhao): implement this option
+    }
+
+    // Summarize frag attributes
+    for (auto& p : summary)
+    {
+        auto& sd = p.second;
+        sd.mean_insert_size = std::accumulate(sd.insert_size.begin(), sd.insert_size.end(), 0.0) / 
+            sd.insert_size.size();
+        std::nth_element(sd.insert_size.begin(), 
+            sd.insert_size.begin()+int(0.5*sd.insert_size.size()),
+            sd.insert_size.end());
+        sd.median_insert_size = *(sd.insert_size.begin()+int(0.5*sd.insert_size.size()));
+        sd.frip = 0;
+        sd.tss_proportion = sd.overlaps * 1.0 / sd.insert_size.size();
+    }
+
+    for (auto& l : _sum_stats)
+    {
+        int nuclear_total = l.nuclear_total;
+        int nuclear_uniq = l.nuclear_uniq;
+        l.dup_proportion = get_dup_proportion(nuclear_total, nuclear_uniq);
+        l.library_size = get_library_size(nuclear_total, nuclear_uniq);
+    }
+    
+    // Add barcodes back if we need to (specified with the one to one option)
+    if (one_to_one)
+    {
+        // TODO(fxzhao)
+    }
+
+    // Create a summarized experiment if we have a valid peak file
+    if (peak_file != "")
+    {
+        // TODO(fxzhao)
+    }
+
+    // Export QC stats
+    FILE * qc_out;
+    fs::path out_qc_file = output_path / (run_name+".QCstats.csv");
+    qc_out = fopen(out_qc_file.c_str(), "w");
+    string header = "DropBarcode,totalNuclearFrags,uniqueNuclearFrags,totalMitoFrags,uniqueMitoFrags,duplicateProportion,librarySize,meanInsertSize,medianInsertSize,tssProportion,FRIP\n";
+    fwrite(header.c_str(), 1, header.size(), qc_out);
+    map<string, SummaryData>::iterator it;
+    for (auto& l : _sum_stats)
+    {
+        it = summary.find(l.drop_barcode); 
+        if (it == summary.end()) continue;
+
+        string s = l.drop_barcode+","+to_string(l.nuclear_total)+","+to_string(l.nuclear_uniq)+","+
+                    to_string(l.mito_total)+","+to_string(l.mito_uniq)+","+to_string(l.dup_proportion)+","+
+                    to_string(l.library_size)+",";
+        auto& sd = it->second;
+        s += to_string(sd.mean_insert_size)+","+to_string(sd.median_insert_size)+","+
+            to_string(sd.tss_proportion)+","+to_string(sd.frip)+"\n";
+        fwrite(s.c_str(), 1, s.size(), qc_out);
+    }
+    fclose(qc_out);
+
+    return 0;
+}
+
+int Bap::plot()
+{
+    fs::path script_path = bin_path / "19_makeKneePlots.R";
+    fs::path parameteter_file = output_path / (run_name+".bapParam.csv");
+    fs::path implicated_barcodes_file = output_path / (run_name+".implicatedBarcodes.csv");
+    fs::path barcode_quant_file = output_path / (run_name+".barcodeQuantSimple.csv");
+    string command = "Rscript "+script_path.string()+" "+parameteter_file.string()+" "+
+                barcode_quant_file.string()+" "+implicated_barcodes_file.string();
+    vector<string> cmd_result;
+    int cmd_rtn = exec_shell(command.c_str(), cmd_result);
+    for (const auto& line : cmd_result)
+        if (!line.empty())
+            spdlog::error(line);
+    if (cmd_rtn == 0)
+        spdlog::info("Execute Rscript success");
+    else
+    {
+        spdlog::info("Execute Rscript fail, rtn:{}", cmd_rtn);
+        return -1;
+    }
 
     return 0;
 }

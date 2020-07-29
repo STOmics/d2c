@@ -31,11 +31,13 @@ struct Bedpe
 
 struct SumStat
 {
-    string drop_barcode;
     int nuclear_total;
     int nuclear_uniq;
     int mito_total;
     int mito_uniq;
+    int library_size;
+    float dup_proportion;
+    string drop_barcode;
 };
 
 class Bap
@@ -53,11 +55,13 @@ private:
     map<string, string> parseChrsFromBedFile();
     void extractBedPE(const BamRecord b1, const BamRecord b2, vector<Bedpe>& bedpes);
     int determineHQBeads();
-    double parseBeadThreshold(string filename);
+    pair<double, double> parseBeadThreshold(string filename);
     int computeStatByChr(int chr_id);
     int determineBarcodeMerge();
     int reannotateFragByChr(int chr_id);
     int annotateBamByChr(int chr_id);
+    int finalQC();
+    int plot();
 
 private:
     // Input parameters
@@ -80,6 +84,7 @@ private:
     bool one_to_one;    // Enforce that each bead barcode maps to one unique drop barcode (cancels the merging)
     fs::path temp_bam_path;
     string drop_tag;
+    string peak_file;   // If supplied, compute FRIP (in QC stats) and generate Summarized Experiment
 
     // Shared data
     vector<vector<Bedpe>> _bedpes_by_chr;
