@@ -7,7 +7,7 @@
  * Copyright (c) 2020 BGI
  */
 
-#include "taskflow.h"
+#include <taskflow/taskflow.hpp>
 #include "bap.h"
 
 #include <ctime>
@@ -29,7 +29,7 @@ namespace fs = std::filesystem;
 
 static const std::string version = "1.0.0";
 
-#define DEVEL
+//#define DEVEL
 
 int main(int argc, char** argv)
 {
@@ -200,6 +200,7 @@ int main(int argc, char** argv)
         spdlog::error("Unknown error");
     }
 
+    cout<<"Finish process."<<endl;
     spdlog::get("main")->info("Bap process done. Elapsed time(s):{:.2f}", timer.toc(1000));
 
 
