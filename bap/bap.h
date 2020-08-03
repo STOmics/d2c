@@ -89,6 +89,7 @@ private:
     // Shared data
     vector<vector<Bedpe>> _bedpes_by_chr;
     map<string, int> _total_bead_quant;
+    //vector<string> _total_bead_order;
     std::mutex _merge_chr_mutex;
     set<string> _hq_beads;
     vector<map<int, int>> _total_nc_cnts;

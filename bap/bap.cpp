@@ -678,6 +678,7 @@ int Bap::splitBamByChr(int chr_id)
     set<string> pcr_dup;
     // Quantify the number of unique fragments per barcode
     map<string, int> bead_quant;
+    //vector<string> bead_order;
     for (auto& b : bedpes)
     {
         // Filter for fragments overlapping the blacklist
@@ -694,6 +695,8 @@ int Bap::splitBamByChr(int chr_id)
         if (pcr_dup.count(key) == 0)
         {
             pcr_dup.insert(key);
+            // if (bead_quant.count(barcode) == 0)
+            //     bead_order.push_back(barcode);
             ++bead_quant[barcode];
         }
     }
@@ -718,6 +721,12 @@ int Bap::splitBamByChr(int chr_id)
     std::lock_guard<std::mutex> guard(_merge_chr_mutex);
     for (auto& b : bead_quant)
         _total_bead_quant[b.first] += b.second;
+    // for (auto& b : bead_order)
+    // {
+    //     if (_total_bead_quant.count(b) == 0)
+    //         _total_bead_order.push_back(b);
+    //     _total_bead_quant[b] += bead_quant[b];
+    // }
 
     return 0;
 }
@@ -759,8 +768,10 @@ int Bap::determineHQBeads()
     spdlog::debug("Dump bead quant to:{}", filename.string());
     out_bead_quant = fopen(filename.c_str(), "w");
     for (auto& b : _total_bead_quant)
+    //for (auto& b : _total_bead_order)
     {
         string s = b.first + "," + to_string(b.second) + "\n";
+        //string s = b + "," + to_string(_total_bead_quant[b]) + "\n";
         fwrite(s.c_str(), 1, s.size(), out_bead_quant);
     }
     fclose(out_bead_quant);
@@ -913,6 +924,7 @@ int Bap::computeStatByChr(int chr_id)
     return 0;
 }
 
+
 int Bap::determineBarcodeMerge()
 {
     // Merge all barcode count
@@ -940,13 +952,26 @@ int Bap::determineBarcodeMerge()
         count_dict[p.first] = p.second * 2;
     }
 
+    // Devel
+    // ifstream tmp("/hwfssz5/ST_BIGDATA/USER/zhaofuxiang/test_bap2/data2/bapfile/knee/Parotid_gland_20200520_AJ34.barcodeQuantSimple.csv");
+    // string line;
+    // while (std::getline(tmp, line))
+    // {
+    //     vector<string> vec_s = split_str(line, ',');
+        
+    //     if (_hq_beads.count(vec_s[0]) == 0) continue;
+    //     nBC.push_back({vec_s[0], stoi(vec_s[1])});
+    // }
+
     // Release memory of hq beads
     _hq_beads.clear();
 
     // Sort by count
-    std::sort(nBC.begin(), nBC.end(), [](pair<string, int>& a, pair<string, int>& b) {
+    std::stable_sort(nBC.begin(), nBC.end(), [](const pair<string, int>& a, const pair<string, int>& b) {
         return a.second > b.second;
     });
+
+
    
     // Calculate jaccard frag
     vector<pair<string, float>> ovdf;
@@ -1023,15 +1048,15 @@ int Bap::determineBarcodeMerge()
 
     // Filter based on the min_jaccard_index 
     // and prepare dict data
-    map<string, set<string>> bc1, bc2;
+    map<string, vector<string>> bc1, bc2;
     for (size_t i = 0; i < ovdf.size(); ++i)
     {
         auto& p = ovdf[i];
         if (p.second <= min_jaccard_index) continue;
         vector<string> vec_s = split_str(p.first, ',');
         if (vec_s.size() != 2) continue;
-        bc1[vec_s[0]].insert(vec_s[1]);
-        bc2[vec_s[1]].insert(vec_s[0]);
+        bc1[vec_s[0]].push_back(vec_s[1]);
+        bc2[vec_s[1]].push_back(vec_s[0]);
     }
 
     // Guess at how wide we need to make the barcodes to handle leading zeros
@@ -1043,25 +1068,33 @@ int Bap::determineBarcodeMerge()
         bar2pos[nBC[i].first] = i;
     }
 
+
+    for (size_t i = 0; i < nBC.size(); ++i)
+    {
+        
+        string barcode = nBC[i].first;
+        spdlog::debug("{} {}", i+1, barcode);
+    }
     // Loop through and eat up barcodes
     int idx = 1;
     for (size_t i = 0; i < nBC.size(); ++i)
     {
+        
         string barcode = nBC[i].first;
         if (barcode.empty()) continue;
-
-        set<string> barcode_combine;
-        barcode_combine.insert(barcode);
+        
+        vector<string> barcode_combine;
+        barcode_combine.push_back(barcode);
 
         // Find friends that are similarly implicated and append from Barcode 1
         if (bc1.count(barcode) != 0)
         {
-            barcode_combine.insert(bc1[barcode].begin(), bc1[barcode].end());
+            barcode_combine.insert(barcode_combine.end(), bc1[barcode].begin(), bc1[barcode].end());
         }
         // Find friends that are similarly implicated and append from Barcode 2
         if (bc2.count(barcode) != 0)
         {
-            barcode_combine.insert(bc2[barcode].begin(), bc2[barcode].end());
+            barcode_combine.insert(barcode_combine.end(), bc2[barcode].begin(), bc2[barcode].end());
         }
 
         // If user species one to one, then only remove that one barcode
