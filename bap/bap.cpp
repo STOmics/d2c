@@ -219,7 +219,8 @@ void Bap::extractBedPE(const BamRecord b1, const BamRecord b2, vector<Bedpe>& be
 
 Bap::Bap(string input_bam, string output_path, string barcode_tag, int mapq, int cores, string run_name, bool tn5,
         double min_barcode_frags, double min_jaccard_index, string ref, string mito_chr, string bed_genome_file,
-        string blacklist_file, string trans_file, bool species_mix, string bin_path) :
+        string blacklist_file, string trans_file, bool species_mix, string bin_path, double barcode_threshold,
+        double jaccard_threshold) :
         input_bam(input_bam),
         output_path(output_path),
         barcode_tag(barcode_tag),
@@ -235,7 +236,9 @@ Bap::Bap(string input_bam, string output_path, string barcode_tag, int mapq, int
         blacklist_file(blacklist_file),
         trans_file(trans_file),
         species_mix(species_mix),
-        bin_path(bin_path) 
+        bin_path(bin_path),
+        barcode_threshold(barcode_threshold),
+        jaccard_threshold(jaccard_threshold)
 {
     nc_threshold = 6;
     regularize_threshold = 4;
@@ -281,26 +284,34 @@ int Bap::taskflow()
     auto samReader = SamReader::FromFile(input_bam);
     std::vector< std::pair< std::string, unsigned int > > contigs = samReader->getContigs();
     spdlog::debug("Bam contigs num: {}", contigs.size());
-
     for (auto& p : contigs)
         _contig_names.push_back(p.first);
 
     // Verify that the supplied reference genome and the bam have overlapping chromosomes
-    // TODO(fxzhao)
-
-    _bedpes_by_chr.resize(contigs.size());
-
-    set<int> used_chrs;
     auto bed_chrs = parseChrsFromBedFile();
-    spdlog::debug("bed_chrs size: {}", bed_chrs.size());
+    spdlog::debug("bed_chrs num: {}", bed_chrs.size());
+
+    vector<int> used_chrs;
+    for (int i = 0; i < contigs.size(); ++i)
+    {
+        if (bed_chrs.count(_contig_names[i]) != 0)
+            used_chrs.push_back(i);
+    }
+    if (used_chrs.empty())
+    {
+        spdlog::error("Found no overlapping chromosomes between bam and reference. Check reference genome specification with the -r flag");
+        return -1;
+    }
+    else
+    {
+        spdlog::info("Found {} chromosomes for analysis (including mitochondria)", used_chrs.size());
+    }
+
+     _bedpes_by_chr.resize(contigs.size());
     auto [S, T] = taskflow.parallel_for(
-        0,
-        int(contigs.size()),
-        1,
+        used_chrs.begin(),
+        used_chrs.end(),
         [&] (int chr_id) {
-            if (bed_chrs.count(contigs[chr_id].first) == 0) return;
-            if (!samReader->QueryByContig(chr_id)) return;
-            used_chrs.insert(chr_id);
             Timer t;
             Bap::splitBamByChr(chr_id);
             spdlog::info("Split bam by chr: {} time(s): {:.2f}", contigs[chr_id].first, t.toc(1000));
@@ -331,11 +342,9 @@ int Bap::taskflow()
     //     if (_bedpes_by_chr[i].size() > 0)
     //         cout<<"has data chr: "<<i<<endl;
     auto [start_cal, end_cal] = taskflow.parallel_for(
-        0,
-        int(contigs.size()),
-        1,
+        used_chrs.begin(),
+        used_chrs.end(),
         [&] (int chr_id) {
-            if (used_chrs.count(chr_id) == 0) return;
             // Skip the mito chrom
             if (_contig_names[chr_id] == mito_chr) return;
             Timer t;
@@ -367,11 +376,9 @@ int Bap::taskflow()
     _dup_frags.resize(contigs.size());
     _frag_stats.resize(contigs.size());
     auto [start_reanno, end_reanno] = taskflow.parallel_for(
-        0,
-        int(contigs.size()),
-        1,
+        used_chrs.begin(),
+        used_chrs.end(),
         [&] (int chr_id) {
-            if (used_chrs.count(chr_id) == 0) return;
             Timer t;
             Bap::reannotateFragByChr(chr_id);
             spdlog::info("Reannotate frags by chr: {} time(s): {:.2f}", _contig_names[chr_id], t.toc(1000));
@@ -388,11 +395,9 @@ int Bap::taskflow()
 
     // Step 6: annotate bam file by chr
     auto [start_annobam, end_annobam] = taskflow.parallel_for(
-        0,
-        int(contigs.size()),
-        1,
+        used_chrs.begin(),
+        used_chrs.end(),
         [&] (int chr_id) {
-            if (used_chrs.count(chr_id) == 0) return;
             // Skip the mito chrom
             if (_contig_names[chr_id] == mito_chr) return;
             Timer t;
@@ -415,9 +420,8 @@ int Bap::taskflow()
         Timer t;
         spdlog::debug("Merge bam");
         std::vector< std::string > bam_files;
-        for (int chr_id = 0; chr_id < contigs.size(); ++chr_id)
+        for (auto& chr_id : used_chrs)
         {
-            if (used_chrs.count(chr_id) == 0) continue;
             // Skip the mito chrom
             if (_contig_names[chr_id] == mito_chr) continue;
             fs::path tmp_bam_file = temp_bam_path / (contigs[chr_id].first+".bam");
@@ -452,24 +456,25 @@ int Bap::taskflow()
     // Step 8: merge fragment files
     auto merge_frags = taskflow.emplace([&] ()
     {
+        spdlog::debug("Merge frags");
         Timer t;
-        for (int chr_id = 0; chr_id < contigs.size(); ++chr_id)
+        for (auto& chr_id : used_chrs)
         {
-            if (used_chrs.count(chr_id) == 0) continue;
             // Skip the mito chrom
-            if (_contig_names[chr_id] == mito_chr) return;
+            if (_contig_names[chr_id] == mito_chr) continue;
             _final_frags.insert(_final_frags.end(), _dup_frags[chr_id].begin(), _dup_frags[chr_id].end());
             _dup_frags[chr_id].clear();
             _dup_frags[chr_id].shrink_to_fit();
         }
         fs::path out_frag_file = output_path / (run_name+".fragment.tsv");
+        spdlog::debug("Dump frags to: {}", out_frag_file.string());
         FILE* out_frag;
         out_frag = fopen(out_frag_file.c_str(), "w");
-        char new_line = '\n';
         for (auto& l : _final_frags)
         {
-            fwrite(l.c_str(), 1, l.size(), out_frag);
-            fwrite(&new_line, 1, 1, out_frag);
+            // Standardized format output
+            string s = l + "\t1\n";
+            fwrite(s.c_str(), 1, s.size(), out_frag);
         }
         fclose(out_frag);
         spdlog::info("Merge frags time(s): {:.2f}", t.toc(1000));
@@ -482,9 +487,8 @@ int Bap::taskflow()
         Timer t;
         map<string, pair<int,int>> nuclear;
         int mito_pos = -1;
-        for (int chr_id = 0; chr_id < contigs.size(); ++chr_id)
+        for (auto& chr_id : used_chrs)
         {
-            if (used_chrs.count(chr_id) == 0) continue;
             if (_contig_names[chr_id] == mito_chr)
             {
                 mito_pos = chr_id;
@@ -777,44 +781,59 @@ int Bap::determineHQBeads()
     fclose(out_bead_quant);
 
     // TODO(fxzhao): change it to cpp
-    // TODO(fxzhao): other conditions
     // Call R script to calculate bead threshold
-    fs::path script_path = bin_path / "10b_knee_execute.R";
-    string command = "Rscript "+script_path.string()+" "+filename.string()+" 1 V2";
-    vector<string> cmd_result;
-    int cmd_rtn = exec_shell(command.c_str(), cmd_result);
-    for (const auto& line : cmd_result)
-        if (!line.empty())
-            spdlog::error(line);
-    if (cmd_rtn == 0)
-        spdlog::info("Execute Rscript success");
-    else
-    {
-        spdlog::error("Execute Rscript fail, rtn:{}", cmd_rtn);
-        return -1;
-    }
-
-    // Define the set of high-quality bead barcodes
-    auto paras = parseBeadThreshold(filename.string()+"_kneeValue.txt");
-    double bead_threshold = paras.first, call_threshold = paras.second;
-    // bead_threshold = 383.111855562311;
-    // call_threshold = 383.111855562311;
-
     fs::path paras_file = output_path / (run_name+".bapParam.csv");
     ofstream ofs(paras_file.string(), std::ofstream::out);
-    ofs << "bead_threshold_nosafety,"<<call_threshold<<endl;
-    ofs << "bead_threshold,"<<bead_threshold<<endl;
+    if (min_barcode_frags == 0.0)
+    {
+        fs::path script_path = bin_path / "10b_knee_execute.R";
+        string command = "Rscript "+script_path.string()+" "+filename.string()+" 1 V2";
+        vector<string> cmd_result;
+        int cmd_rtn = exec_shell(command.c_str(), cmd_result);
+        for (const auto& line : cmd_result)
+            if (!line.empty())
+                spdlog::error(line);
+        if (cmd_rtn == 0)
+            spdlog::info("Execute Rscript success");
+        else
+        {
+            spdlog::error("Execute Rscript fail, rtn:{}", cmd_rtn);
+            return -1;
+        }
+
+        // Define the set of high-quality bead barcodes
+        auto paras = parseBeadThreshold(filename.string()+"_kneeValue.txt");
+        min_barcode_frags = paras.first;
+        double call_threshold = paras.second;
+        
+        ofs << "bead_threshold_nosafety,"<<call_threshold<<endl;
+    }
+
+    // Add threshold for reducing data to be processed
+    vector<int> bead_nums;
+    for (auto& p : _total_bead_quant)
+        bead_nums.push_back(p.second);
+    std::nth_element(bead_nums.begin(), bead_nums.begin()+int(barcode_threshold*bead_nums.size()), bead_nums.end(), std::greater<int>());
+    int calculated_barcode_frags = *(bead_nums.begin()+int(barcode_threshold*bead_nums.size()));
+    spdlog::debug("barcode filter rate: {} calculated frags: {} min barcode frags: {}", barcode_threshold, calculated_barcode_frags, min_barcode_frags);
+    if (calculated_barcode_frags > min_barcode_frags)
+    {
+        spdlog::debug("Set min barcode frags from {} to {}", min_barcode_frags, calculated_barcode_frags);
+        min_barcode_frags = calculated_barcode_frags;
+    }
+
+    ofs << "bead_threshold,"<<min_barcode_frags<<endl;
     ofs.close();
 				
-    // Devel
-    //bead_threshold = 0;
-
+    // Do the filter   
     for (auto& p : _total_bead_quant)
     {
-        if (p.second >= bead_threshold)
+        if (p.second >= min_barcode_frags)
             _hq_beads.insert(p.first);
     }
-    spdlog::debug("bead threshold: {}", bead_threshold);
+
+    spdlog::debug("bead threshold: {}", min_barcode_frags);
+    spdlog::debug("total beads num: {} filter by min frags threshold: {}", _total_bead_quant.size(), _hq_beads.size());
     return 0;
 }
 
@@ -924,23 +943,40 @@ int Bap::computeStatByChr(int chr_id)
     return 0;
 }
 
+inline string substrRight(string s, int n = 18)
+{
+    return s.substr(s.size()-n);
+}
+
+
+bool Bap::checkTn5(string s)
+{
+    if (!tn5) return true;
+
+    size_t pos = s.find(',');
+    if (pos == std::string::npos) return false;
+
+    string s1 = s.substr(0, pos);
+    string s2 = s.substr(pos+1);
+    return (substrRight(s1) == substrRight(s2));
+}
 
 int Bap::determineBarcodeMerge()
 {
+    spdlog::debug("tn5: {}", tn5);
     // Merge all barcode count
     map<string, int> sum_dt;
     for (auto& m : _total_bead_cnts)
+    {
         for (auto& p : m)
         {
-            if (p.second >= regularize_threshold)
+            // Only consider merging when Tn5 is the same
+            if (p.second >= regularize_threshold && checkTn5(p.first))
                 sum_dt[p.first] += p.second;
         }
-
-    // Only consider merging when Tn5 is the same
-    if (tn5)
-    {
-        // TODO(fxzhao): implement tn5 option
+        m.clear();
     }
+    _total_bead_cnts.clear();
      
     // Filter and calculate nBC
     vector<pair<string, int>> nBC;
@@ -989,7 +1025,7 @@ int Bap::determineBarcodeMerge()
     }
     
     // Sort by jaccard_frag
-    std::sort(ovdf.begin(), ovdf.end(), [](pair<string, float>& a, pair<string, float>& b) {
+    std::sort(ovdf.begin(), ovdf.end(), [](const pair<string, float>& a, const pair<string, float>& b) {
         return a.second > b.second;
     });
 
@@ -998,29 +1034,48 @@ int Bap::determineBarcodeMerge()
     // Call knee if we need to
     if (min_jaccard_index == 0.0)
     {
-        // TODO(fxzhao): implement jaccard option
-        // fs::path script_path = bin_path / "10b_knee_execute.R";
-        // string command = "Rscript "+script_path.string()+" "+filename.string()+" 1 V2";
-        // vector<string> cmd_result;
-        // int cmd_rtn = exec_shell(command.c_str(), cmd_result);
-        // for (const auto& line : cmd_result)
-        //     if (!line.empty())
-        //         spdlog::error(line);
-        // if (cmd_rtn == 0)
-        //     spdlog::info("Execute Rscript success");
-        // else
-        // {
-        //     spdlog::info("Execute Rscript fail, rtn:{}", cmd_rtn);
-        //     return -1;
-        // }
+        // Prepare jaccard frag data for calling R script
+        fs::path filename = output_path / "jaccard_out.csv";
+        ofstream jaccard_out(filename.string(), std::ofstream::out);
+        int size = min(1000000, int(ovdf.size()));
+        for (int i = 0; i < size; ++i)
+            jaccard_out<<ovdf[i].second<<"\n";
+        jaccard_out.close();
 
-        // // Define the set of high-quality bead barcodes
-        // double bead_threshold = parseBeadThreshold(filename.string()+"_kneeValue.txt");
+        fs::path script_path = bin_path / "11b_knee_execute.R";
+        string command = "Rscript "+script_path.string()+" "+filename.string()+" 1 V1";
+        vector<string> cmd_result;
+        int cmd_rtn = exec_shell(command.c_str(), cmd_result);
+        for (const auto& line : cmd_result)
+            if (!line.empty())
+                spdlog::error(line);
+        if (cmd_rtn == 0)
+            spdlog::info("Execute Rscript success");
+        else
+        {
+            spdlog::info("Execute Rscript fail, rtn:{}", cmd_rtn);
+            return -1;
+        }
 
-        ofs << "bead_threshold_nosafety,"<<min_jaccard_index<<endl;
+        // Define the set of high-quality bead barcodes
+        auto paras = parseBeadThreshold(filename.string()+"_kneeValue.txt");
+        min_jaccard_index = paras.first;
+        double call_threshold = paras.second;
+
+        ofs << "jaccard_threshold_nosafety,"<<call_threshold<<endl;
     }
+
+    float calculated_jaccard_index = ovdf[int(ovdf.size()*jaccard_threshold)].second;
+    spdlog::debug("jaccard filter rate: {} calculated jaccard: {} min barcode frags: {}", jaccard_threshold, calculated_jaccard_index, min_jaccard_index);
+    if (calculated_jaccard_index > min_jaccard_index)
+    {
+        spdlog::debug("Set min jaccard index from {} to {}", min_jaccard_index, calculated_jaccard_index);
+        min_jaccard_index = calculated_jaccard_index;
+    }
+
     ofs << "jaccard_threshold,"<<min_jaccard_index<<endl;
     ofs.close();
+    spdlog::debug("jaccard threshold: {}", min_jaccard_index);
 
     // Export the implicated barcodes
     FILE * tbl_out;
@@ -1068,13 +1123,12 @@ int Bap::determineBarcodeMerge()
         bar2pos[nBC[i].first] = i;
     }
 
-
-    for (size_t i = 0; i < nBC.size(); ++i)
-    {
-        
-        string barcode = nBC[i].first;
-        spdlog::debug("{} {}", i+1, barcode);
-    }
+    // Devel
+    // for (size_t i = 0; i < nBC.size(); ++i)
+    // {
+    //     string barcode = nBC[i].first;
+    //     spdlog::debug("{} {}", i+1, barcode);
+    // }
     // Loop through and eat up barcodes
     int idx = 1;
     for (size_t i = 0; i < nBC.size(); ++i)
@@ -1102,20 +1156,18 @@ int Bap::determineBarcodeMerge()
 
         // Make a drop barcode and save our progress
         stringstream ss;
-        if (!tn5)
-        {
-            ss << run_name <<"_BC"<<std::setfill ('0') << std::setw (guess) << idx<<
+        ss << "_BC"<<std::setfill ('0') << std::setw (guess) << idx<<
                 "_N"<<std::setw (2)<<barcode_combine.size();
-        }   
-        else
-        {
-            // TODO(fxzhao): implement this
-        }
         for (auto& b : barcode_combine)
         {
             if (bar2pos.count(b) != 0)
             {
-                _drop_barcodes[b] = ss.str();
+                string drop_barcode;
+                if (!tn5)
+                    drop_barcode = run_name + ss.str();
+                else
+                    drop_barcode = run_name + "_Tn5-" + substrRight(b) + ss.str();
+                _drop_barcodes[b] = drop_barcode;
                 nBC[bar2pos[b]].first = "";
             }
         }

@@ -60,6 +60,10 @@ int main(int argc, char** argv)
     app.add_option("--bf", min_barcode_frags, "Minimum number of fragments to be thresholded for doublet merging");
     double min_jaccard_index = 0.0;
     app.add_option("--ji", min_jaccard_index, "Minimum jaccard index for collapsing bead barcodes to cell barcodes");
+    double barcode_threshold = 0.01;
+    app.add_option("--bp", barcode_threshold, "Percentage of minimum number of fragments to be thresholded for doublet merging")->check(CLI::Range(0.0,1.0));
+    double jaccard_threshold = 0.3;
+    app.add_option("--jp", jaccard_threshold, "Percentage of minimum jaccard index for collapsing bead barcodes to cell barcodes")->check(CLI::Range(0.0,1.0));
 
     // Model organism
     string ref = "hg19";
@@ -89,7 +93,7 @@ int main(int argc, char** argv)
         if (name.substr(0, 6) == "chrom_") supported_genomes.insert(name.substr(6));
     }
     // Check jaccard index is valid
-    if (min_jaccard_index > 1 || min_barcode_frags < 0)
+    if (min_jaccard_index > 1 || min_jaccard_index < 0)
     {
         cout<<"User specified jaccard index > 1 or < 0:"<<min_jaccard_index<<endl;
     }
@@ -179,14 +183,15 @@ int main(int argc, char** argv)
     spdlog::get("main")->info("{} input_bam:{} output_path:{} barcode_tag:{} "
         "mapq:{} cores:{} run_name:{} tn5:{} min_barcode_frags:{} min_jaccard_index:{} "
         "ref:{} mito_chr:{} bed_genome_file:{} blacklist_file:{} trans_file:{} "
-        "species_mix:{}",
+        "species_mix:{} barcode_threshold:{} jaccard_threshold:{}",
         argv[0], input_bam, output_path, barcode_tag, mapq, cores, run_name, tn5,
         min_barcode_frags, min_jaccard_index, ref, mito_chr, bed_genome_file,
-        blacklist_file, trans_file, species_mix);
+        blacklist_file, trans_file, species_mix, barcode_threshold, jaccard_threshold);
 
     Bap bap = Bap(input_bam, output_path, barcode_tag, mapq, cores, run_name, tn5,
         min_barcode_frags, min_jaccard_index, ref, mito_chr, bed_genome_file,
-        blacklist_file, trans_file, species_mix, exe_path.string());
+        blacklist_file, trans_file, species_mix, exe_path.string(), barcode_threshold,
+        jaccard_threshold);
     try
     {
         bap.run();

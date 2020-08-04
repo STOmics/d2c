@@ -48,4 +48,4 @@ target_link_libraries(app_bap
     )
 
 set_target_properties(app_bap PROPERTIES OUTPUT_NAME "bap")
-install(FILES 10b_knee_execute.R 00_knee_CL.R 19_makeKneePlots.R DESTINATION bin)
+install(FILES 11b_knee_execute.R 10b_knee_execute.R 00_knee_CL.R 19_makeKneePlots.R DESTINATION bin)

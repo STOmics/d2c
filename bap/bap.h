@@ -45,7 +45,8 @@ class Bap
 public:
     Bap(string input_bam, string output_path, string barcode_tag, int mapq, int cores, string run_name, bool tn5,
         double min_barcode_frags, double min_jaccard_index, string ref, string mito_chr, string bed_genome_file,
-        string blacklist_file, string trans_file, bool species_mix, string bin_path);
+        string blacklist_file, string trans_file, bool species_mix, string bin_path, double barcode_threshold,
+        double jaccard_threshold);
     ~Bap() {};
     int run();
     int taskflow();
@@ -62,6 +63,7 @@ private:
     int annotateBamByChr(int chr_id);
     int finalQC();
     int plot();
+    bool checkTn5(string s);
 
 private:
     // Input parameters
@@ -77,6 +79,7 @@ private:
     string bed_genome_file, blacklist_file, trans_file;
     bool species_mix;
     fs::path bin_path;
+    double barcode_threshold, jaccard_threshold;
 
     // Specific parameters;
     int nc_threshold;   // Number of barcodes that a paired-end read must be observed for the read to be filtered
