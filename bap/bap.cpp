@@ -808,6 +808,7 @@ int Bap::determineHQBeads()
     // Call R script to calculate bead threshold
     fs::path paras_file = output_path / (run_name+".bapParam.csv");
     ofstream ofs(paras_file.string(), std::ofstream::out);
+    ofs.precision(15);
     if (min_barcode_frags == 0.0)
     {
         fs::path script_path = bin_path / "10b_knee_execute.R";
@@ -855,6 +856,12 @@ int Bap::determineHQBeads()
         if (p.second >= min_barcode_frags)
             _hq_beads.insert(p.first);
     }
+    // Export high-quality beads
+    fs::path out_hq_file = output_path / (run_name+".HQbeads.tsv");
+    ofstream out_hq(out_hq_file.string(), std::ofstream::out);
+    for (auto& b : _hq_beads)
+        out_hq << b << "\n";
+    out_hq.close();
 
     spdlog::debug("bead threshold: {}", min_barcode_frags);
     spdlog::debug("total beads num: {} filter by min frags threshold: {}", _total_bead_quant.size(), _hq_beads.size());
@@ -1055,11 +1062,12 @@ int Bap::determineBarcodeMerge()
 
     fs::path paras_file = output_path / (run_name+".bapParam.csv");
     ofstream ofs(paras_file.string(), std::ofstream::out | std::ofstream::app);
+    ofs.precision(15);
     // Call knee if we need to
     if (min_jaccard_index == 0.0)
     {
         // Prepare jaccard frag data for calling R script
-        fs::path filename = output_path / "jaccard_out.csv";
+        fs::path filename = output_path / (run_name+".jaccard.csv");
         ofstream jaccard_out(filename.string(), std::ofstream::out);
         int size = min(1000000, int(ovdf.size()));
         for (int i = 0; i < size; ++i)
@@ -1462,11 +1470,11 @@ int Bap::finalQC()
         if (it == summary.end()) continue;
 
         string s = l.drop_barcode+","+to_string(l.nuclear_total)+","+to_string(l.nuclear_uniq)+","+
-                    to_string(l.mito_total)+","+to_string(l.mito_uniq)+","+to_string(l.dup_proportion)+","+
+                    to_string(l.mito_total)+","+to_string(l.mito_uniq)+","+f2str(l.dup_proportion, 3)+","+
                     to_string(l.library_size)+",";
         auto& sd = it->second;
-        s += to_string(sd.mean_insert_size)+","+to_string(sd.median_insert_size)+","+
-            to_string(sd.tss_proportion)+","+to_string(sd.frip)+"\n";
+        s += f2str(sd.mean_insert_size, 1)+","+to_string(sd.median_insert_size)+","+
+            f2str(sd.tss_proportion, 4)+","+f2str(sd.frip, 4)+"\n";
         fwrite(s.c_str(), 1, s.size(), qc_out);
     }
     fclose(qc_out);

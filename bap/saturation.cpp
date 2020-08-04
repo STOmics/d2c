@@ -115,6 +115,7 @@ int Saturation::calculateSaturation(string out_file)
     }
 
     _keys.clear();
+    _keys.shrink_to_fit();
 
     return 0;
 }
