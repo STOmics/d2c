@@ -60,11 +60,7 @@ int main(int argc, char** argv)
     app.add_option("--bf", min_barcode_frags, "Minimum number of fragments to be thresholded for doublet merging");
     double min_jaccard_index = 0.0;
     app.add_option("--ji", min_jaccard_index, "Minimum jaccard index for collapsing bead barcodes to cell barcodes");
-    double barcode_threshold = 0.01;
-    app.add_option("--bp", barcode_threshold, "Percentage of minimum number of fragments to be thresholded for doublet merging")->check(CLI::Range(0.0,1.0));
-    double jaccard_threshold = 0.3;
-    app.add_option("--jp", jaccard_threshold, "Percentage of minimum jaccard index for collapsing bead barcodes to cell barcodes")->check(CLI::Range(0.0,1.0));
-
+    
     // Model organism
     string ref = "hg19";
     app.add_option("-r", ref, "Specify supported reference genome, default hg19");
@@ -75,6 +71,15 @@ int main(int argc, char** argv)
     app.add_option("--bg", bed_genome_file, "Bedtools genome file")->check(CLI::ExistingFile);
     app.add_option("--bl", blacklist_file, "Blacklist bed file")->check(CLI::ExistingFile);
     app.add_option("--ts", trans_file, "Path bed file of transcription start sites")->check(CLI::ExistingFile);
+
+    // Specific parameters
+    double barcode_threshold = 0.01;
+    app.add_option("--bp", barcode_threshold, "Percentage of minimum number of fragments to be thresholded for doublet merging")->check(CLI::Range(0.0,1.0));
+    double jaccard_threshold = 0.3;
+    app.add_option("--jp", jaccard_threshold, "Percentage of minimum jaccard index for collapsing bead barcodes to cell barcodes")->check(CLI::Range(0.0,1.0));
+
+    bool saturation_on = false;
+    app.add_flag("--sat", saturation_on, "Output sequencing saturation file, default False");
 
     CLI11_PARSE(app, argc, argv);
 
@@ -183,15 +188,16 @@ int main(int argc, char** argv)
     spdlog::get("main")->info("{} input_bam:{} output_path:{} barcode_tag:{} "
         "mapq:{} cores:{} run_name:{} tn5:{} min_barcode_frags:{} min_jaccard_index:{} "
         "ref:{} mito_chr:{} bed_genome_file:{} blacklist_file:{} trans_file:{} "
-        "species_mix:{} barcode_threshold:{} jaccard_threshold:{}",
+        "species_mix:{} barcode_threshold:{} jaccard_threshold:{} saturation_on:{}",
         argv[0], input_bam, output_path, barcode_tag, mapq, cores, run_name, tn5,
         min_barcode_frags, min_jaccard_index, ref, mito_chr, bed_genome_file,
-        blacklist_file, trans_file, species_mix, barcode_threshold, jaccard_threshold);
+        blacklist_file, trans_file, species_mix, barcode_threshold, jaccard_threshold,
+        saturation_on);
 
     Bap bap = Bap(input_bam, output_path, barcode_tag, mapq, cores, run_name, tn5,
         min_barcode_frags, min_jaccard_index, ref, mito_chr, bed_genome_file,
         blacklist_file, trans_file, species_mix, exe_path.string(), barcode_threshold,
-        jaccard_threshold);
+        jaccard_threshold, saturation_on);
     try
     {
         bap.run();

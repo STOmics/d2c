@@ -16,6 +16,7 @@
 using namespace std;
 
 #include "samReader.h"
+#include "saturation.h"
 
 #include <filesystem>
 namespace fs = std::filesystem;
@@ -46,7 +47,7 @@ public:
     Bap(string input_bam, string output_path, string barcode_tag, int mapq, int cores, string run_name, bool tn5,
         double min_barcode_frags, double min_jaccard_index, string ref, string mito_chr, string bed_genome_file,
         string blacklist_file, string trans_file, bool species_mix, string bin_path, double barcode_threshold,
-        double jaccard_threshold);
+        double jaccard_threshold, bool saturation_on);
     ~Bap() {};
     int run();
     int taskflow();
@@ -80,6 +81,7 @@ private:
     bool species_mix;
     fs::path bin_path;
     double barcode_threshold, jaccard_threshold;
+    bool saturation_on;
 
     // Specific parameters;
     int nc_threshold;   // Number of barcodes that a paired-end read must be observed for the read to be filtered
@@ -104,4 +106,6 @@ private:
     vector<set<string>> _keep_qnames;
     vector<map<string, pair<int, int>>> _frag_stats;
     vector<SumStat> _sum_stats;
+
+    Saturation saturation;
 };

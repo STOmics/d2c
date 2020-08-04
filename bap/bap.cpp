@@ -14,6 +14,7 @@
 #include "utility.h"
 #include "bamCat.h"
 
+
 #include <spdlog/spdlog.h>
 
 #include <taskflow/taskflow.hpp>
@@ -220,7 +221,7 @@ void Bap::extractBedPE(const BamRecord b1, const BamRecord b2, vector<Bedpe>& be
 Bap::Bap(string input_bam, string output_path, string barcode_tag, int mapq, int cores, string run_name, bool tn5,
         double min_barcode_frags, double min_jaccard_index, string ref, string mito_chr, string bed_genome_file,
         string blacklist_file, string trans_file, bool species_mix, string bin_path, double barcode_threshold,
-        double jaccard_threshold) :
+        double jaccard_threshold, bool saturation_on) :
         input_bam(input_bam),
         output_path(output_path),
         barcode_tag(barcode_tag),
@@ -238,7 +239,8 @@ Bap::Bap(string input_bam, string output_path, string barcode_tag, int mapq, int
         species_mix(species_mix),
         bin_path(bin_path),
         barcode_threshold(barcode_threshold),
-        jaccard_threshold(jaccard_threshold)
+        jaccard_threshold(jaccard_threshold),
+        saturation_on(saturation_on)
 {
     nc_threshold = 6;
     regularize_threshold = 4;
@@ -307,7 +309,8 @@ int Bap::taskflow()
         spdlog::info("Found {} chromosomes for analysis (including mitochondria)", used_chrs.size());
     }
 
-     _bedpes_by_chr.resize(contigs.size());
+    
+    _bedpes_by_chr.resize(contigs.size());
     auto [S, T] = taskflow.parallel_for(
         used_chrs.begin(),
         used_chrs.end(),
@@ -324,6 +327,20 @@ int Bap::taskflow()
     {
         successor.name((contigs.begin()+(s++))->first);
     });
+
+    // Step 1.1: sequencing saturation
+    
+    auto sequence_saturation = taskflow.emplace([&] ()
+    {
+        if (saturation_on)
+        {
+            Timer t;
+            fs::path sat_out_file = output_path / (run_name+".sequenceSaturation.tsv");
+            saturation.calculateSaturation(sat_out_file.string());
+            spdlog::info("Sequencing saturation time(s): {:.2f}", t.toc(1000));
+        }
+    }).name("Sequence saturation");
+    sequence_saturation.succeed(T);
 
     // Step 2: determine hight quality beads
     auto determine_hq_beads = taskflow.emplace([&] ()
@@ -725,6 +742,13 @@ int Bap::splitBamByChr(int chr_id)
     std::lock_guard<std::mutex> guard(_merge_chr_mutex);
     for (auto& b : bead_quant)
         _total_bead_quant[b.first] += b.second;
+    // Merge frags data for sequencing saturation
+    if (saturation_on)
+    {
+        for (auto& bedpe : bedpes)
+            saturation.addData(bedpe.start, bedpe.end, bedpe.barcode, chr_id);
+    }
+
     // for (auto& b : bead_order)
     // {
     //     if (_total_bead_quant.count(b) == 0)

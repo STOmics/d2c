@@ -28,6 +28,7 @@ set (src
     bap.cpp
     samReader.cpp
     bamCat.cpp
+    saturation.cpp
 
     main.cpp
     )
