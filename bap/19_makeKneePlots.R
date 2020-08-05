@@ -124,7 +124,7 @@ if(file.exists(beadBarcodesFile)){
 if(file.exists(jaccardFragsFile)){
   
   # Import jaccard overlap measures
-  jaccard_frag_vec <- fread(cmd = paste0("cat < ", jaccardFragsFile, " | head -1000000"))[["jaccard_frag"]]
+  jaccard_frag_vec <- fread(cmd = paste0("zcat < ", jaccardFragsFile, " | head -1000000"))[["jaccard_frag"]]
   
   # Make a data frame for plotting with ticks
   jaccard_mut <- data.frame(jaccard_frag = jaccard_frag_vec) %>%

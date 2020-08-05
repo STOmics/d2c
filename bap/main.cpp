@@ -73,7 +73,7 @@ int main(int argc, char** argv)
     app.add_option("--ts", trans_file, "Path bed file of transcription start sites")->check(CLI::ExistingFile);
 
     // Specific parameters
-    double barcode_threshold = 0.01;
+    double barcode_threshold = 0.1;
     app.add_option("--bp", barcode_threshold, "Percentage of minimum number of fragments to be thresholded for doublet merging")->check(CLI::Range(0.0,1.0));
     double jaccard_threshold = 0.3;
     app.add_option("--jp", jaccard_threshold, "Percentage of minimum jaccard index for collapsing bead barcodes to cell barcodes")->check(CLI::Range(0.0,1.0));

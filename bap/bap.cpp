@@ -13,6 +13,7 @@
 #include "timer.h"
 #include "utility.h"
 #include "bamCat.h"
+#include "gz_io.h"
 
 
 #include <spdlog/spdlog.h>
@@ -483,17 +484,17 @@ int Bap::taskflow()
             _dup_frags[chr_id].clear();
             _dup_frags[chr_id].shrink_to_fit();
         }
-        fs::path out_frag_file = output_path / (run_name+".fragment.tsv");
+        fs::path out_frag_file = output_path / (run_name+".fragments.tsv.gz");
         spdlog::debug("Dump frags to: {}", out_frag_file.string());
-        FILE* out_frag;
-        out_frag = fopen(out_frag_file.c_str(), "w");
+        cmpFile out_frag;
+        out_frag = cmpOpen(out_frag_file.c_str());
         for (auto& l : _final_frags)
         {
             // Standardized format output
             string s = l + "\t1\n";
-            fwrite(s.c_str(), 1, s.size(), out_frag);
+            cmpFunc(out_frag, s.c_str());
         }
-        fclose(out_frag);
+        cmpClose(out_frag);
         spdlog::info("Merge frags time(s): {:.2f}", t.toc(1000));
     }).name("Merge fragments");
     merge_frags.succeed(end_reanno);
@@ -589,7 +590,7 @@ int Bap::splitBamByChr(int chr_id)
     spdlog::debug("Call splitBamByChr: {}", _contig_names[chr_id]);
 
     // Map {qname:barcode} used in later
-    map<string, string> qname2barcodes;
+    //map<string, string> qname2barcodes;
 
     //auto contigs = sr->getContigs();
     string chr_str = _contig_names[chr_id];
@@ -1110,11 +1111,11 @@ int Bap::determineBarcodeMerge()
     spdlog::debug("jaccard threshold: {}", min_jaccard_index);
 
     // Export the implicated barcodes
-    FILE * tbl_out;
-    fs::path implicated_barcode_file = output_path / (run_name+".implicatedBarcodes.csv"); 
-    tbl_out = fopen(implicated_barcode_file.c_str(), "w");
+    cmpFile tbl_out;
+    fs::path implicated_barcode_file = output_path / (run_name+".implicatedBarcodes.csv.gz"); 
+    tbl_out = cmpOpen(implicated_barcode_file.c_str());
     string header = "barc1,barc2,N_both,N_barc1,N_barc2,jaccard_frag,merged\n";
-    fwrite(header.c_str(), 1, header.size(), tbl_out);
+    cmpFunc(tbl_out, header.c_str());
     for (size_t i = 0; i < ovdf.size(); ++i)
     {
         auto& p = ovdf[i];
@@ -1129,9 +1130,9 @@ int Bap::determineBarcodeMerge()
         s += p.second > min_jaccard_index ? "TRUE" : "FALSE";
         s += "\n";
 
-        fwrite(s.c_str(), 1, s.size(), tbl_out);
+        cmpFunc(tbl_out, s.c_str());
     }
-    fclose(tbl_out);
+    cmpClose(tbl_out);
 
     // Filter based on the min_jaccard_index 
     // and prepare dict data
@@ -1486,7 +1487,7 @@ int Bap::plot()
 {
     fs::path script_path = bin_path / "19_makeKneePlots.R";
     fs::path parameteter_file = output_path / (run_name+".bapParam.csv");
-    fs::path implicated_barcodes_file = output_path / (run_name+".implicatedBarcodes.csv");
+    fs::path implicated_barcodes_file = output_path / (run_name+".implicatedBarcodes.csv.gz");
     fs::path barcode_quant_file = output_path / (run_name+".barcodeQuantSimple.csv");
     string command = "Rscript "+script_path.string()+" "+parameteter_file.string()+" "+
                 barcode_quant_file.string()+" "+implicated_barcodes_file.string();
