@@ -21,3 +21,7 @@ string f2str(float f, int bits);
 
 // For executing shell script
 int exec_shell(const char* cmd, std::vector< std::string >& resvec);
+
+// Get physical memory used by process in real time
+// Only support linux, unit is MB
+size_t physical_memory_used_by_process();

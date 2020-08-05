@@ -141,7 +141,7 @@ int get_library_size(int t, int u)
     return round(u*(m+M)/2.0);
 }
 
-void Bap::extractBedPE(const BamRecord b1, const BamRecord b2, vector<Bedpe>& bedpes)
+void Bap::extractBedPE(const BamRecord b1, const BamRecord b2, vector<Bedpe>& bedpes, int l1, int l2)
 {
     // Initialize BEDPE variables
     string chrom1, chrom2, strand1, strand2;
@@ -212,7 +212,9 @@ void Bap::extractBedPE(const BamRecord b1, const BamRecord b2, vector<Bedpe>& be
             Bedpe bedpe;
             bedpe.start = start1;
             bedpe.end = end2;
-            bedpe.qname = getQname(b1);
+            // bedpe.qname = getQname(b1);
+            bedpe.qname1 = l1;
+            bedpe.qname2 = l2;
             bedpe.barcode = barcode;
             bedpes.push_back(bedpe);
         }
@@ -310,7 +312,7 @@ int Bap::taskflow()
         spdlog::info("Found {} chromosomes for analysis (including mitochondria)", used_chrs.size());
     }
 
-    
+    spdlog::debug("Initial memory(MB): {}", physical_memory_used_by_process());
     _bedpes_by_chr.resize(contigs.size());
     auto [S, T] = taskflow.parallel_for(
         used_chrs.begin(),
@@ -346,6 +348,7 @@ int Bap::taskflow()
     // Step 2: determine hight quality beads
     auto determine_hq_beads = taskflow.emplace([&] ()
     {
+        spdlog::debug("SplitBam memory(MB): {}", physical_memory_used_by_process());
         Timer t;
         Bap::determineHQBeads();
         spdlog::info("Determine high-quality beads time(s): {:.2f}", t.toc(1000));
@@ -606,33 +609,36 @@ int Bap::splitBamByChr(int chr_id)
     //     getTag(bam_record, barcode_tag.c_str(), barcode);
     //     qname2barcodes[qname] = barcode;
     // }
-    map<string, BamRecord> pe_dict;
-    map<string, BamRecord>::iterator it;
+    map<string, pair<BamRecord, int>> pe_dict;
+    map<string, pair<BamRecord, int>>::iterator it;
     auto& bedpes = _bedpes_by_chr[chr_id];
-    while (true)
+    BamRecord bam_record = bam_init1();
+    int pos = -1;
+    while (sr->next(bam_record))
     {
-        BamRecord bam_record = bam_init1();
-        if(sr->next(bam_record, FLAG))
+        ++pos;
+        if ((bam_record->core.flag & FLAG) != FLAG) 
+            continue;
+
+        BamRecord b = bam_init1();
+        bam_copy1(b, bam_record);
+        string qname = getQname(b);
+        it = pe_dict.find(qname);
+        if (it == pe_dict.end())
         {
-            string qname = getQname(bam_record);
-            it = pe_dict.find(qname);
-            if (it == pe_dict.end())
-            {
-                pe_dict[qname] = bam_record;
-            }
-            else
-            {
-                extractBedPE(it->second, bam_record, bedpes);
-                bam_destroy1(it->second);
-                pe_dict.erase(it);
-                bam_destroy1(bam_record);
-            }
+            pe_dict[qname] = {b, pos};
         }
         else
-            break;
+        {
+            extractBedPE(it->second.first, b, bedpes, it->second.second, pos);
+            bam_destroy1(it->second.first);
+            pe_dict.erase(it);
+            bam_destroy1(b);
+        }
     }
+    bam_destroy1(bam_record);
     for (auto& p : pe_dict)
-        bam_destroy1(p.second);
+        bam_destroy1(p.second.first);
     pe_dict.clear();
     // while (sr->next(bam_record1, FLAG))
     // {
@@ -1262,7 +1268,7 @@ struct cmp
 int Bap::reannotateFragByChr(int chr_id)
 {
     set<string> pcr_dup;
-    set<string> qname_dup;
+    set<int> qname_dup;
     // Store n_total and n_unique as pair
     map<string, pair<int, int>>& merge_ss = _frag_stats[chr_id];
     string chr = _contig_names[chr_id];
@@ -1280,7 +1286,9 @@ int Bap::reannotateFragByChr(int chr_id)
         if (pcr_dup.count(s) == 0)
         {
             pcr_dup.insert(s);
-            qname_dup.insert(bedpe.qname);
+            // qname_dup.insert(bedpe.qname);
+            qname_dup.insert(bedpe.qname1);
+            qname_dup.insert(bedpe.qname2);
             ++merge_ss[cell_barcode].second;
         }
 
@@ -1348,16 +1356,19 @@ int Bap::annotateBamByChr(int chr_id)
     string bead_bc, drop_bc;
     map<string, string>::iterator it;
     // Iterate through bam
+    int line = -1;
     while (sr->next(b))
     {
+        ++line;
         if (!getTag(b, barcode_tag.c_str(), bead_bc)) continue;
         it = _drop_barcodes.find(bead_bc);
         if (it == _drop_barcodes.end()) continue;
         drop_bc = it->second;
 
         // Handle droplet barcodes that we want to consider writing out
-        string qname = bam_get_qname(b);
-        if (keep_reads.count(qname) == 0) continue;
+        // string qname = bam_get_qname(b);
+        // if (keep_reads.count(qname) == 0) continue;
+        if (keep_reads.count(line) == 0) continue;
         bam_aux_append(b, drop_tag.c_str(), 'Z', drop_bc.size()+1, ( uint8_t* )drop_bc.c_str());
         [[maybe_unused]] int ret = sam_write1(out, header, b);
     }

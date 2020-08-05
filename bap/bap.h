@@ -26,7 +26,9 @@ struct Bedpe
 {
     int start;
     int end;
-    string qname;
+    // string qname;
+    int qname1;
+    int qname2;
     string barcode;
 };
 
@@ -55,7 +57,7 @@ public:
 
 private:
     map<string, string> parseChrsFromBedFile();
-    void extractBedPE(const BamRecord b1, const BamRecord b2, vector<Bedpe>& bedpes);
+    void extractBedPE(const BamRecord b1, const BamRecord b2, vector<Bedpe>& bedpes, int l1, int l2);
     int determineHQBeads();
     pair<double, double> parseBeadThreshold(string filename);
     int computeStatByChr(int chr_id);
@@ -103,7 +105,7 @@ private:
     vector<string> _contig_names;
     vector<vector<string>> _dup_frags;
     vector<string> _final_frags;
-    vector<set<string>> _keep_qnames;
+    vector<set<int>> _keep_qnames;
     vector<map<string, pair<int, int>>> _frag_stats;
     vector<SumStat> _sum_stats;
 

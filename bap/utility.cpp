@@ -76,3 +76,32 @@ int exec_shell(const char* cmd, std::vector< std::string >& resvec)
 
     return rtn;
 }
+
+size_t physical_memory_used_by_process()
+{
+    int result = 0;
+#ifndef _WIN32
+    FILE* file = fopen("/proc/self/status", "r");
+    char  line[128];
+    while (fgets(line, 128, file) != nullptr)
+    {
+        if (strncmp(line, "VmRSS:", 6) == 0)
+        {
+            int len = strlen(line);
+
+            const char* p = line;
+            for (; std::isdigit(*p) == false; ++p)
+            {
+            }
+
+            line[len - 3] = 0;
+            result        = atoi(p);
+
+            break;
+        }
+    }
+    fclose(file);
+#endif
+
+    return result / 1024;
+}
