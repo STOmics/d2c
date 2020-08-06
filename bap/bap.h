@@ -29,7 +29,8 @@ struct Bedpe
     // string qname;
     int qname1;
     int qname2;
-    string barcode;
+    // string barcode;
+    int barcode;
 };
 
 struct SumStat
@@ -49,7 +50,7 @@ public:
     Bap(string input_bam, string output_path, string barcode_tag, int mapq, int cores, string run_name, bool tn5,
         double min_barcode_frags, double min_jaccard_index, string ref, string mito_chr, string bed_genome_file,
         string blacklist_file, string trans_file, bool species_mix, string bin_path, double barcode_threshold,
-        double jaccard_threshold, bool saturation_on);
+        double jaccard_threshold, bool saturation_on, string barcode_list);
     ~Bap() {};
     int run();
     int taskflow();
@@ -67,6 +68,9 @@ private:
     int finalQC();
     int plot();
     bool checkTn5(string s);
+    bool checkTn5(size_t l);
+    bool parseBarcodeList();
+    inline string int2Barcode(int i);
 
 private:
     // Input parameters
@@ -84,6 +88,7 @@ private:
     fs::path bin_path;
     double barcode_threshold, jaccard_threshold;
     bool saturation_on;
+    string barcode_list;
 
     // Specific parameters;
     int nc_threshold;   // Number of barcodes that a paired-end read must be observed for the read to be filtered
@@ -95,13 +100,13 @@ private:
 
     // Shared data
     vector<vector<Bedpe>> _bedpes_by_chr;
-    map<string, int> _total_bead_quant;
+    map<int, int> _total_bead_quant;
     //vector<string> _total_bead_order;
     std::mutex _merge_chr_mutex;
-    set<string> _hq_beads;
+    set<int> _hq_beads;
     vector<map<int, int>> _total_nc_cnts;
-    vector<map<string, int>> _total_bead_cnts;
-    map<string, string> _drop_barcodes;
+    vector<map<size_t, int>> _total_bead_cnts;
+    map<int, string> _drop_barcodes;
     vector<string> _contig_names;
     vector<vector<string>> _dup_frags;
     vector<string> _final_frags;
@@ -109,5 +114,10 @@ private:
     vector<map<string, pair<int, int>>> _frag_stats;
     vector<SumStat> _sum_stats;
 
+    // Instance of sequencing saturation
     Saturation saturation;
+
+    // Barcode list data, for encoding and decodeing barcode strings
+    vector<string> _barcode_names;
+    unordered_map<string, int> _barcode2int;
 };

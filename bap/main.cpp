@@ -43,6 +43,8 @@ int main(int argc, char** argv)
     string input_bam, output_path;
     app.add_option("-i", input_bam, "Input bam filename")->check(CLI::ExistingFile)->required();
     app.add_option("-o", output_path, "Output result path")->required();
+    string barcode_list;
+    app.add_option("-b", barcode_list, "Barcode list file")->check(CLI::ExistingFile)->required();
 
     // Optional parameters
     string barcode_tag = "XB";
@@ -188,16 +190,17 @@ int main(int argc, char** argv)
     spdlog::get("main")->info("{} input_bam:{} output_path:{} barcode_tag:{} "
         "mapq:{} cores:{} run_name:{} tn5:{} min_barcode_frags:{} min_jaccard_index:{} "
         "ref:{} mito_chr:{} bed_genome_file:{} blacklist_file:{} trans_file:{} "
-        "species_mix:{} barcode_threshold:{} jaccard_threshold:{} saturation_on:{}",
+        "species_mix:{} barcode_threshold:{} jaccard_threshold:{} saturation_on:{} "
+        "barcode_list:{}",
         argv[0], input_bam, output_path, barcode_tag, mapq, cores, run_name, tn5,
         min_barcode_frags, min_jaccard_index, ref, mito_chr, bed_genome_file,
         blacklist_file, trans_file, species_mix, barcode_threshold, jaccard_threshold,
-        saturation_on);
+        saturation_on, barcode_list);
 
     Bap bap = Bap(input_bam, output_path, barcode_tag, mapq, cores, run_name, tn5,
         min_barcode_frags, min_jaccard_index, ref, mito_chr, bed_genome_file,
         blacklist_file, trans_file, species_mix, exe_path.string(), barcode_threshold,
-        jaccard_threshold, saturation_on);
+        jaccard_threshold, saturation_on, barcode_list);
     try
     {
         bap.run();

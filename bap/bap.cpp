@@ -215,7 +215,16 @@ void Bap::extractBedPE(const BamRecord b1, const BamRecord b2, vector<Bedpe>& be
             // bedpe.qname = getQname(b1);
             bedpe.qname1 = l1;
             bedpe.qname2 = l2;
-            bedpe.barcode = barcode;
+            
+            string b1 = barcode.substr(0, 10);
+            string b2 = barcode.substr(10, 10);
+            if (_barcode2int.count(b1) == 0 || _barcode2int.count(b2) == 0)
+            {
+                spdlog::warn("Invalid barcode {} not exists in barcode list", barcode);
+                return;
+            }
+            bedpe.barcode = (_barcode2int[b1] << 16) + _barcode2int[b2];
+            //cout<<b1<<" "<<b2<<" "<<bedpe.barcode<<endl;
             bedpes.push_back(bedpe);
         }
     }
@@ -224,7 +233,7 @@ void Bap::extractBedPE(const BamRecord b1, const BamRecord b2, vector<Bedpe>& be
 Bap::Bap(string input_bam, string output_path, string barcode_tag, int mapq, int cores, string run_name, bool tn5,
         double min_barcode_frags, double min_jaccard_index, string ref, string mito_chr, string bed_genome_file,
         string blacklist_file, string trans_file, bool species_mix, string bin_path, double barcode_threshold,
-        double jaccard_threshold, bool saturation_on) :
+        double jaccard_threshold, bool saturation_on, string barcode_list) :
         input_bam(input_bam),
         output_path(output_path),
         barcode_tag(barcode_tag),
@@ -243,7 +252,8 @@ Bap::Bap(string input_bam, string output_path, string barcode_tag, int mapq, int
         bin_path(bin_path),
         barcode_threshold(barcode_threshold),
         jaccard_threshold(jaccard_threshold),
-        saturation_on(saturation_on)
+        saturation_on(saturation_on),
+        barcode_list(barcode_list)
 {
     nc_threshold = 6;
     regularize_threshold = 4;
@@ -264,6 +274,12 @@ int Bap::run()
             spdlog::warn("Failed to create directory: {}", temp_bam_path.string());
             return -1;
         }
+    }
+    // Parse barcode list
+    if (!parseBarcodeList())
+    {
+        spdlog::warn("Failed to parse barcode list: {}", barcode_list);
+        return -2;
     }
     spdlog::info("Prepare time(s): {:.2f}", timer.toc(1000));
 
@@ -705,7 +721,7 @@ int Bap::splitBamByChr(int chr_id)
 
     set<string> pcr_dup;
     // Quantify the number of unique fragments per barcode
-    map<string, int> bead_quant;
+    map<int, int> bead_quant;
     //vector<string> bead_order;
     for (auto& b : bedpes)
     {
@@ -718,8 +734,8 @@ int Bap::splitBamByChr(int chr_id)
         // Discard the fragments overlapping the blacklist
         if (res.begin() != res.end()) continue;
 
-        string barcode = b.barcode;
-        string key = to_string(start)+'\t'+to_string(end)+barcode;
+        int barcode = b.barcode;
+        string key = to_string(start)+'\t'+to_string(end)+'\t'+to_string(barcode);
         if (pcr_dup.count(key) == 0)
         {
             pcr_dup.insert(key);
@@ -750,11 +766,11 @@ int Bap::splitBamByChr(int chr_id)
     for (auto& b : bead_quant)
         _total_bead_quant[b.first] += b.second;
     // Merge frags data for sequencing saturation
-    if (saturation_on)
-    {
-        for (auto& bedpe : bedpes)
-            saturation.addData(bedpe.start, bedpe.end, bedpe.barcode, chr_id);
-    }
+    // if (saturation_on)
+    // {
+    //     for (auto& bedpe : bedpes)
+    //         saturation.addData(bedpe.start, bedpe.end, bedpe.barcode, chr_id);
+    // }
 
     // for (auto& b : bead_order)
     // {
@@ -805,7 +821,7 @@ int Bap::determineHQBeads()
     for (auto& b : _total_bead_quant)
     //for (auto& b : _total_bead_order)
     {
-        string s = b.first + "," + to_string(b.second) + "\n";
+        string s = int2Barcode(b.first) + "," + to_string(b.second) + "\n";
         //string s = b + "," + to_string(_total_bead_quant[b]) + "\n";
         fwrite(s.c_str(), 1, s.size(), out_bead_quant);
     }
@@ -867,7 +883,7 @@ int Bap::determineHQBeads()
     fs::path out_hq_file = output_path / (run_name+".HQbeads.tsv");
     ofstream out_hq(out_hq_file.string(), std::ofstream::out);
     for (auto& b : _hq_beads)
-        out_hq << b << "\n";
+        out_hq << int2Barcode(b) << "\n";
     out_hq.close();
 
     spdlog::debug("bead threshold: {}", min_barcode_frags);
@@ -925,7 +941,7 @@ int Bap::computeStatByChr(int chr_id)
     }
 
     set<string> uniq_frags;
-    map<int, vector<string>> overlap_start, overlap_end;
+    map<int, vector<int>> overlap_start, overlap_end;
     for (auto& pos : frags_pos)
     {
         if (pos == -1) continue;
@@ -933,8 +949,8 @@ int Bap::computeStatByChr(int chr_id)
         auto& bedpe = frags_data[pos];
         int start = bedpe.start;
         int end = bedpe.end;
-        string barcode = bedpe.barcode;
-        string key = to_string(start)+'\t'+to_string(end)+barcode;
+        int barcode = bedpe.barcode;
+        string key = to_string(start)+'\t'+to_string(end)+'\t'+to_string(barcode);
         if (uniq_frags.count(key) != 0) continue;
 
         uniq_frags.insert(key);
@@ -943,7 +959,7 @@ int Bap::computeStatByChr(int chr_id)
     }
 
     // Double to consider left and right inserts
-    map<string, int> bead_cnts;
+    map<size_t, int> bead_cnts;
     for (auto& overlap : {overlap_start, overlap_end})
     {
         for (auto& p : overlap)
@@ -956,9 +972,9 @@ int Bap::computeStatByChr(int chr_id)
                 {
                     if (v[i] == v[j]) continue;
                     if (v[i] > v[j])
-                        ++bead_cnts[v[i]+","+v[j]];
+                        ++bead_cnts[((size_t) v[i] << 32) + v[j]];
                     else
-                        ++bead_cnts[v[j]+","+v[i]];
+                        ++bead_cnts[((size_t) v[j] << 32) + v[i]];
                 }
             }
         }
@@ -981,12 +997,12 @@ int Bap::computeStatByChr(int chr_id)
     return 0;
 }
 
-inline string substrRight(string s, int n = 18)
+inline string substrRight(string s, int n = 6)
 {
     return s.substr(s.size()-n);
 }
 
-
+// Example: ATCG,TCGA
 bool Bap::checkTn5(string s)
 {
     if (!tn5) return true;
@@ -998,12 +1014,21 @@ bool Bap::checkTn5(string s)
     string s2 = s.substr(pos+1);
     return (substrRight(s1) == substrRight(s2));
 }
+// Example: int32int32
+bool Bap::checkTn5(size_t l)
+{
+    if (!tn5) return true;
+
+    string s1 = _barcode_names[l >> 48] + _barcode_names[(l >> 32) & 0xFFFF];
+    string s2 = _barcode_names[(l >> 16) & 0xFFFF] + _barcode_names[l & 0xFFFF];
+    return (substrRight(s1) == substrRight(s2));
+}
 
 int Bap::determineBarcodeMerge()
 {
     spdlog::debug("tn5: {}", tn5);
     // Merge all barcode count
-    map<string, int> sum_dt;
+    map<size_t, int> sum_dt;
     for (auto& m : _total_bead_cnts)
     {
         for (auto& p : m)
@@ -1017,8 +1042,8 @@ int Bap::determineBarcodeMerge()
     _total_bead_cnts.clear();
      
     // Filter and calculate nBC
-    vector<pair<string, int>> nBC;
-    map<string, int> count_dict;
+    vector<pair<int, int>> nBC;
+    map<int, int> count_dict;
     for (auto& p : _total_bead_quant)
     {
         if (_hq_beads.count(p.first) == 0) continue;
@@ -1041,29 +1066,26 @@ int Bap::determineBarcodeMerge()
     _hq_beads.clear();
 
     // Sort by count
-    std::stable_sort(nBC.begin(), nBC.end(), [](const pair<string, int>& a, const pair<string, int>& b) {
+    std::stable_sort(nBC.begin(), nBC.end(), [](const pair<int, int>& a, const pair<int, int>& b) {
         return a.second > b.second;
     });
 
 
    
     // Calculate jaccard frag
-    vector<pair<string, float>> ovdf;
+    vector<pair<size_t, float>> ovdf;
     for (auto& p : sum_dt)
     {
-        vector<string> vec_s = split_str(p.first, ',');
-        if (vec_s.size() != 2) continue;
-
         int N_both = p.second;
-        int N_barc1 = count_dict[vec_s[0]];
-        int N_barc2 = count_dict[vec_s[1]];
+        int N_barc1 = count_dict[p.first >> 32];
+        int N_barc2 = count_dict[p.first & 0xFFFFFFFF];
         float jaccard_frag = round((N_both)/(N_barc1+N_barc2-N_both+0.05), 5);
         if (jaccard_frag <= 0.0) continue;
         ovdf.push_back({p.first, jaccard_frag});
     }
     
     // Sort by jaccard_frag
-    std::sort(ovdf.begin(), ovdf.end(), [](const pair<string, float>& a, const pair<string, float>& b) {
+    std::sort(ovdf.begin(), ovdf.end(), [](const pair<size_t, float>& a, const pair<size_t, float>& b) {
         return a.second > b.second;
     });
 
@@ -1125,12 +1147,13 @@ int Bap::determineBarcodeMerge()
     for (size_t i = 0; i < ovdf.size(); ++i)
     {
         auto& p = ovdf[i];
-        string s = p.first + ",";
+        int b1 = p.first >> 32;
+        int b2 = p.first & 0xFFFFFFFF;
+        string s = int2Barcode(b1)+","+int2Barcode(b2) + ",";
         s += to_string(sum_dt[p.first]) + ",";
-        vector<string> vec_s = split_str(p.first, ',');
-        if (vec_s.size() != 2) continue;
-        int N_barc1 = count_dict[vec_s[0]];
-        int N_barc2 = count_dict[vec_s[1]];
+        
+        int N_barc1 = count_dict[b1];
+        int N_barc2 = count_dict[b2];
         s += to_string(N_barc1) + "," + to_string(N_barc2) + ",";
         s += f2str(p.second, 5) + ",";
         s += p.second > min_jaccard_index ? "TRUE" : "FALSE";
@@ -1142,21 +1165,22 @@ int Bap::determineBarcodeMerge()
 
     // Filter based on the min_jaccard_index 
     // and prepare dict data
-    map<string, vector<string>> bc1, bc2;
+    map<int, vector<int>> bc1, bc2;
     for (size_t i = 0; i < ovdf.size(); ++i)
     {
         auto& p = ovdf[i];
         if (p.second <= min_jaccard_index) continue;
-        vector<string> vec_s = split_str(p.first, ',');
-        if (vec_s.size() != 2) continue;
-        bc1[vec_s[0]].push_back(vec_s[1]);
-        bc2[vec_s[1]].push_back(vec_s[0]);
+        
+        int b1 = p.first >> 32;
+        int b2 = p.first & 0xFFFFFFFF;
+        bc1[b1].push_back(b2);
+        bc2[b2].push_back(b1);
     }
 
     // Guess at how wide we need to make the barcodes to handle leading zeros
     int guess = ceil(log10(nBC.size()));
     // Map from barcode to position in nBC
-    map<string, int> bar2pos;
+    map<int, int> bar2pos;
     for (size_t i = 0; i < nBC.size(); ++i)
     {
         bar2pos[nBC[i].first] = i;
@@ -1173,10 +1197,10 @@ int Bap::determineBarcodeMerge()
     for (size_t i = 0; i < nBC.size(); ++i)
     {
         
-        string barcode = nBC[i].first;
-        if (barcode.empty()) continue;
+        int barcode = nBC[i].first;
+        if (barcode == -1) continue;
         
-        vector<string> barcode_combine;
+        vector<int> barcode_combine;
         barcode_combine.push_back(barcode);
 
         // Find friends that are similarly implicated and append from Barcode 1
@@ -1205,9 +1229,9 @@ int Bap::determineBarcodeMerge()
                 if (!tn5)
                     drop_barcode = run_name + ss.str();
                 else
-                    drop_barcode = run_name + "_Tn5-" + substrRight(b) + ss.str();
+                    drop_barcode = run_name + "_Tn5-" + substrRight(_barcode_names[b]) + ss.str();
                 _drop_barcodes[b] = drop_barcode;
-                nBC[bar2pos[b]].first = "";
+                nBC[bar2pos[b]].first = -1;
             }
         }
         ++idx;
@@ -1218,7 +1242,7 @@ int Bap::determineBarcodeMerge()
     bt = fopen(barcode_translate_file.c_str(), "w");
     for (auto& p : _drop_barcodes)
     {
-        string s = p.first + "\t" + p.second+"\n";
+        string s = int2Barcode(p.first) + "\t" + p.second+"\n";
         fwrite(s.c_str(), 1, s.size(), bt);
     }
     fclose(bt);
@@ -1273,11 +1297,11 @@ int Bap::reannotateFragByChr(int chr_id)
     map<string, pair<int, int>>& merge_ss = _frag_stats[chr_id];
     string chr = _contig_names[chr_id];
     auto& frags_data = _bedpes_by_chr[chr_id];
-    map<string, string>::iterator it;
+    map<int, string>::iterator it;
     for (auto& bedpe : frags_data)
     {
         // Filter for eligible barcodes
-        string barcode = bedpe.barcode;
+        int barcode = bedpe.barcode;
         it = _drop_barcodes.find(barcode);
         if (it == _drop_barcodes.end()) continue;
 
@@ -1354,14 +1378,23 @@ int Bap::annotateBamByChr(int chr_id)
 
     BamRecord b = bam_init1();
     string bead_bc, drop_bc;
-    map<string, string>::iterator it;
+    map<int, string>::iterator it;
     // Iterate through bam
     int line = -1;
     while (sr->next(b))
     {
         ++line;
         if (!getTag(b, barcode_tag.c_str(), bead_bc)) continue;
-        it = _drop_barcodes.find(bead_bc);
+        
+        string b1 = bead_bc.substr(0,10);
+        string b2 = bead_bc.substr(10, 10);
+        if (_barcode2int.count(b1) == 0 || _barcode2int.count(b2) == 0)
+        {
+            spdlog::debug("Invalid barcode {} not exists in barcode list", bead_bc);
+            continue;
+        }
+        int barcode = (_barcode2int[b1] << 16) + _barcode2int[b2];
+        it = _drop_barcodes.find(barcode);
         if (it == _drop_barcodes.end()) continue;
         drop_bc = it->second;
 
@@ -1516,4 +1549,25 @@ int Bap::plot()
     }
 
     return 0;
+}
+
+bool Bap::parseBarcodeList()
+{
+    ifstream ifs(barcode_list, std::ifstream::in);
+    string line;
+    int pos = 0;
+    while (std::getline(ifs, line))
+    {
+        _barcode_names.push_back(line);
+        _barcode2int[line] = pos++;
+    }
+    if (_barcode_names.empty()) return false;
+    return true;
+}
+
+inline string Bap::int2Barcode(int i)
+{
+    //spdlog::debug("i: {}", i);
+    string res = _barcode_names[i >> 16] + _barcode_names[i & 0xFFFF];
+    return res;
 }
