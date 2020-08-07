@@ -23,6 +23,8 @@
 #include <fstream>
 #include <algorithm>
 #include <exception>
+#include <thread>
+#include <tuple>
 
 
 const int FLAG = 2;
@@ -288,7 +290,7 @@ int Bap::run()
     spdlog::info("Execute taskflow time(s): {:.2f}", timer.toc(1000));
 
     // Clean up
-    //fs::remove_all(temp_bam_path);
+    fs::remove_all(temp_bam_path);
     spdlog::info("Clean up time(s): {:.2f}", timer.toc(1000));
 
     return 0;
@@ -313,7 +315,7 @@ int Bap::taskflow()
     spdlog::debug("bed_chrs num: {}", bed_chrs.size());
 
     vector<int> used_chrs;
-    for (int i = 0; i < contigs.size(); ++i)
+    for (size_t i = 0; i < contigs.size(); ++i)
     {
         if (bed_chrs.count(_contig_names[i]) != 0)
             used_chrs.push_back(i);
@@ -348,7 +350,6 @@ int Bap::taskflow()
     });
 
     // Step 1.1: sequencing saturation
-    
     auto sequence_saturation = taskflow.emplace([&] ()
     {
         if (saturation_on)
@@ -401,6 +402,7 @@ int Bap::taskflow()
     // Step 4: barcode merge
     auto barcode_merge = taskflow.emplace([&] ()
     {
+        spdlog::debug("ComputeByChr memory(MB): {}", physical_memory_used_by_process());
         Timer t;
         Bap::determineBarcodeMerge();
         spdlog::info("Determine barcode merge time(s): {:.2f}", t.toc(1000));
@@ -488,11 +490,11 @@ int Bap::taskflow()
         spdlog::info("Merge bam time(s): {:.2f}", t.toc(1000));
     }).name("Merge bam");
     merge_bam.succeed(end_annobam);
-    //end_annobam.precede(merge_bam);
 
     // Step 8: merge fragment files
     auto merge_frags = taskflow.emplace([&] ()
     {
+        spdlog::debug("Reannotate frags memory(MB): {}", physical_memory_used_by_process());
         spdlog::debug("Merge frags");
         Timer t;
         for (auto& chr_id : used_chrs)
@@ -509,7 +511,7 @@ int Bap::taskflow()
         out_frag = cmpOpen(out_frag_file.c_str());
         for (auto& l : _final_frags)
         {
-            // Standardized format output
+            // Standardized format output, insert one column data
             string s = l + "\t1\n";
             cmpFunc(out_frag, s.c_str());
         }
@@ -607,24 +609,8 @@ int Bap::splitBamByChr(int chr_id)
     std::unique_ptr<SamReader> sr = SamReader::FromFile(input_bam);
     if (!sr->QueryByContig(chr_id)) return 0;
     spdlog::debug("Call splitBamByChr: {}", _contig_names[chr_id]);
-
-    // Map {qname:barcode} used in later
-    //map<string, string> qname2barcodes;
-
-    //auto contigs = sr->getContigs();
     string chr_str = _contig_names[chr_id];
-    // BamRecord bam_record1 = bam_init1();
-    // BamRecord bam_record2 = bam_init1();
-    // while (true)
-    // {
-    //     if (!sr->next(bam_record)) break;
-    //     while (bam_record)
-    //     if (bam_record->core.qual <= mapq) continue;
-    //     string qname = bam_get_qname(bam_record);
-    //     string barcode("NA");
-    //     getTag(bam_record, barcode_tag.c_str(), barcode);
-    //     qname2barcodes[qname] = barcode;
-    // }
+   
     map<string, pair<BamRecord, int>> pe_dict;
     map<string, pair<BamRecord, int>>::iterator it;
     auto& bedpes = _bedpes_by_chr[chr_id];
@@ -656,26 +642,8 @@ int Bap::splitBamByChr(int chr_id)
     for (auto& p : pe_dict)
         bam_destroy1(p.second.first);
     pe_dict.clear();
-    // while (sr->next(bam_record1, FLAG))
-    // {
-    //     //spdlog::debug("qname:{}", getQname(bam_record1));
-    //     sr->next(bam_record2, FLAG);
-    //     if (getQname(bam_record1) != getQname(bam_record2))
-    //     {
-    //         while (getQname(bam_record1) != getQname(bam_record2))
-    //         {
-    //             bam_copy1(bam_record1, bam_record2);
-    //             sr->next(bam_record2, FLAG);
-    //         }
-    //         extractBedPE(bam_record1, bam_record2, bedpes);
-    //     }
-    //     else if (isPaired(bam_record1) && isPaired(bam_record2))
-    //     {
-    //         extractBedPE(bam_record1, bam_record2, bedpes);
-    //     }
-    // }
     spdlog::debug("chr: {} frags size: {}", _contig_names[chr_id], bedpes.size());
-
+   
     // Devel
     // if (chr_str == "chrMT")
     // {
@@ -684,14 +652,6 @@ int Bap::splitBamByChr(int chr_id)
     //         ofs<<p.start<<'\t'<<p.end<<'\t'<<p.qname<<'\t'<<p.barcode<<endl;
     //     ofs.close();
     // }
-
-    // bam_destroy1(bam_record1);
-    // bam_destroy1(bam_record2);
-
-    // for (int i = 0; i < 10; ++i)
-    //     cout<<bedpes[i].start<<" "<<bedpes[i].end<<" "<<bedpes[i].qname<<" "<<bedpes[i].barcode<<endl;
-    // for (auto& b : bedpes)
-    //     spdlog::debug("bedpe qname:{}", b.qname);
 
     // Load blacklist file and construct interval tree
     ifstream blf(blacklist_file, std::ifstream::in);
@@ -719,9 +679,9 @@ int Bap::splitBamByChr(int chr_id)
         mytree.insert(node);
     }
 
-    set<string> pcr_dup;
+    unordered_set<string> pcr_dup;
     // Quantify the number of unique fragments per barcode
-    map<int, int> bead_quant;
+    unordered_map<int, int> bead_quant;
     //vector<string> bead_order;
     for (auto& b : bedpes)
     {
@@ -739,13 +699,11 @@ int Bap::splitBamByChr(int chr_id)
         if (pcr_dup.count(key) == 0)
         {
             pcr_dup.insert(key);
-            // if (bead_quant.count(barcode) == 0)
-            //     bead_order.push_back(barcode);
             ++bead_quant[barcode];
         }
     }
     pcr_dup.clear();
-
+    
     // Devel
     // if (chr_str == "chrMT")
     // {
@@ -756,28 +714,21 @@ int Bap::splitBamByChr(int chr_id)
     // }
     
     // Devel
-    int total_cnt = 0;
-    for (auto& b : bead_quant)
-        total_cnt += b.second;
-    spdlog::debug("chr: {} bead_quant size: {} total count: {}", _contig_names[chr_id], bead_quant.size(), total_cnt);
+    // int total_cnt = 0;
+    // for (auto& b : bead_quant)
+    //     total_cnt += b.second;
+    // spdlog::debug("chr: {} bead_quant size: {} total count: {}", _contig_names[chr_id], bead_quant.size(), total_cnt);
 
     // Merge bead quant of all chrs
     std::lock_guard<std::mutex> guard(_merge_chr_mutex);
     for (auto& b : bead_quant)
         _total_bead_quant[b.first] += b.second;
-    // Merge frags data for sequencing saturation
-    // if (saturation_on)
-    // {
-    //     for (auto& bedpe : bedpes)
-    //         saturation.addData(bedpe.start, bedpe.end, bedpe.barcode, chr_id);
-    // }
 
-    // for (auto& b : bead_order)
-    // {
-    //     if (_total_bead_quant.count(b) == 0)
-    //         _total_bead_order.push_back(b);
-    //     _total_bead_quant[b] += bead_quant[b];
-    // }
+    // Merge frags data for sequencing saturation
+    if (saturation_on)
+    {
+        saturation.addData(bedpes);
+    }
 
     return 0;
 }
@@ -895,9 +846,9 @@ int Bap::computeStatByChr(int chr_id)
 {
     spdlog::debug("in computeStatByChr: {}", _contig_names[chr_id]);
     // Filter fragments
-    map<unsigned long long, int> dict;
-    vector<int> frags_pos;
+    unordered_map<unsigned long long, int> dict;
     auto& frags_data = _bedpes_by_chr[chr_id];
+    vector<bool> frags_pos(frags_data.size());
     if (frags_data.empty()) return 0;
 
     for (size_t i = 0; i < frags_data.size(); ++i)
@@ -910,43 +861,36 @@ int Bap::computeStatByChr(int chr_id)
         int end = bedpe.end;
         ++dict[((unsigned long long)start << 32) + end];
         
-        frags_pos.push_back(i);
+        frags_pos[i] = true;
     }
 
     // Quantify NC + export
     auto& cnts = _total_nc_cnts[chr_id];
-    int total = 0;
     for (auto& p : dict)
     {
         cnts[p.second] += p.second;
-        total += p.second;
     }
-    
-    spdlog::debug("chr: {} nc size: {} total: {}", _contig_names[chr_id], cnts.size(), total);
-    // ofstream out_nc_count(out_nc_count_file, std::ofstream::out);
-    // for (auto& p : cnts)
-    // {
-    //     out_nc_count<<p.first<<"\t"<<p.second<<endl;
-    // }
-    // out_nc_count.close();
+    spdlog::debug("chr: {} nc size: {}", _contig_names[chr_id], cnts.size());
 
     // Pull out barcode for retained fragments
     for (size_t i = 0; i < frags_pos.size(); ++i)
     {
-        auto& bedpe = frags_data[frags_pos[i]];
+        if (!frags_pos[i]) continue;
+
+        auto& bedpe = frags_data[i];
         int start = bedpe.start;
         int end = bedpe.end;
         if (dict[((unsigned long long)start << 32) + end] > nc_threshold)
-            frags_pos[i] = -1;
+            frags_pos[i] = false;
     }
 
     set<string> uniq_frags;
     map<int, vector<int>> overlap_start, overlap_end;
-    for (auto& pos : frags_pos)
+    for (size_t i = 0; i < frags_pos.size(); ++i)
     {
-        if (pos == -1) continue;
+        if (!frags_pos[i]) continue;
 
-        auto& bedpe = frags_data[pos];
+        auto& bedpe = frags_data[i];
         int start = bedpe.start;
         int end = bedpe.end;
         int barcode = bedpe.barcode;
@@ -957,7 +901,7 @@ int Bap::computeStatByChr(int chr_id)
         overlap_start[start].push_back(barcode);
         overlap_end[end].push_back(barcode);
     }
-
+   
     // Double to consider left and right inserts
     map<size_t, int> bead_cnts;
     for (auto& overlap : {overlap_start, overlap_end})
@@ -980,7 +924,7 @@ int Bap::computeStatByChr(int chr_id)
         }
     }
     bead_cnts.swap(_total_bead_cnts[chr_id]);
-    
+   
     // Devel
     // int line_num = 0, total_num = 0;
     // for (auto& p : bead_cnts)
@@ -1070,8 +1014,6 @@ int Bap::determineBarcodeMerge()
         return a.second > b.second;
     });
 
-
-   
     // Calculate jaccard frag
     vector<pair<size_t, float>> ovdf;
     for (auto& p : sum_dt)
@@ -1291,13 +1233,13 @@ struct cmp
 
 int Bap::reannotateFragByChr(int chr_id)
 {
-    set<string> pcr_dup;
-    set<int> qname_dup;
+    unordered_set<string> pcr_dup;
+    unordered_set<int> qname_dup;
     // Store n_total and n_unique as pair
     map<string, pair<int, int>>& merge_ss = _frag_stats[chr_id];
     string chr = _contig_names[chr_id];
     auto& frags_data = _bedpes_by_chr[chr_id];
-    map<int, string>::iterator it;
+    unordered_map<int, string>::iterator it;
     for (auto& bedpe : frags_data)
     {
         // Filter for eligible barcodes
@@ -1307,16 +1249,16 @@ int Bap::reannotateFragByChr(int chr_id)
 
         string cell_barcode = it->second;
         string s = chr+"\t"+to_string(bedpe.start)+"\t"+to_string(bedpe.end)+"\t"+cell_barcode;
+        auto& p = merge_ss[cell_barcode];
         if (pcr_dup.count(s) == 0)
         {
             pcr_dup.insert(s);
             // qname_dup.insert(bedpe.qname);
             qname_dup.insert(bedpe.qname1);
             qname_dup.insert(bedpe.qname2);
-            ++merge_ss[cell_barcode].second;
+            ++p.second;
         }
-
-        ++merge_ss[cell_barcode].first;
+        ++p.first;
     }
     qname_dup.swap(_keep_qnames[chr_id]);
 
@@ -1325,40 +1267,12 @@ int Bap::reannotateFragByChr(int chr_id)
     std::sort(dup_keys.begin(), dup_keys.end(), cmp());
     dup_keys.swap(_dup_frags[chr_id]);
 
-    pcr_dup.clear();
     // Release the memory
-    
+    pcr_dup.clear();
     _bedpes_by_chr[chr_id].clear();
     _bedpes_by_chr[chr_id].shrink_to_fit();
-
-    //cout<<"chr "<<chr_id<<" keep_qname size: "<<_keep_qnames[chr_id].size()<<" dup_frags size: "<<_dup_frags[chr_id].size()<<endl;
-
-    // Export duplicated fragments
-    // FILE *frag_anno;
-    // fs::path path = output_path;
-    // fs::path frag_anno_file = path / "frag.bedpe..tsv";
-    // frag_anno = fopen(frag_anno_file.c_str(), "w");
-    // for (auto& k : dup_keys)
-    // {
-    //     string s = k + "\t" + pcr_dup[k] + "\n";
-    //     fwrite(s.c_str(), 1, s.size(), frag_anno);
-    // }
-    // fclose(frag_anno);
-
-    // Export summary statistics
-    // FILE *frag_ss;
-    // fs::path frag_ss_file = path / "frag.sumstats.tsv";
-    // frag_ss = fopen(frag_ss_file.c_str(), "w");
-    // for (auto& p : merge_ss)
-    // {
-    //     auto& pp = p.second;
-    //     if (pp.first == 0 || pp.second == 0) continue;
-    //     string s = p.first + "\t" + to_string(pp.first) + "\t" + to_string(pp.second)
-    //         + "\t" + chr + "\n";
-    //     fwrite(s.c_str(), 1, s.size(), frag_ss);
-    // }
-    // fclose(frag_ss);
-
+    
+    spdlog::debug("memory(MB): {}", physical_memory_used_by_process());
 
     return 0;
 }
@@ -1378,15 +1292,16 @@ int Bap::annotateBamByChr(int chr_id)
 
     BamRecord b = bam_init1();
     string bead_bc, drop_bc;
-    map<int, string>::iterator it;
+    unordered_map<int, string>::iterator it;
     // Iterate through bam
     int line = -1;
     while (sr->next(b))
     {
         ++line;
+        if (keep_reads.count(line) == 0) continue;
         if (!getTag(b, barcode_tag.c_str(), bead_bc)) continue;
         
-        string b1 = bead_bc.substr(0,10);
+        string b1 = bead_bc.substr(0, 10);
         string b2 = bead_bc.substr(10, 10);
         if (_barcode2int.count(b1) == 0 || _barcode2int.count(b2) == 0)
         {
@@ -1399,9 +1314,6 @@ int Bap::annotateBamByChr(int chr_id)
         drop_bc = it->second;
 
         // Handle droplet barcodes that we want to consider writing out
-        // string qname = bam_get_qname(b);
-        // if (keep_reads.count(qname) == 0) continue;
-        if (keep_reads.count(line) == 0) continue;
         bam_aux_append(b, drop_tag.c_str(), 'Z', drop_bc.size()+1, ( uint8_t* )drop_bc.c_str());
         [[maybe_unused]] int ret = sam_write1(out, header, b);
     }
@@ -1438,7 +1350,6 @@ int Bap::finalQC()
 
     // Store has_overlap and insert size as pair
     map<string, SummaryData> summary;
-    
     for (auto& l : _final_frags)
     {
         vector<string> vec_s = split_str(l, '\t');
@@ -1453,7 +1364,6 @@ int Bap::finalQC()
         {
             const auto& tree = mytrees.at(chr);
             const auto& res = tree.query(query_range);
-            
             if (res.begin() != res.end())
                 ++sd.overlaps;
         }
@@ -1461,6 +1371,8 @@ int Bap::finalQC()
         sd.insert_size.push_back(insert_size);
     }
     mytrees.clear();
+    _final_frags.clear();
+    _final_frags.shrink_to_fit();
 
     // Deal with FRIP if we have a peak file
     if (peak_file != "")

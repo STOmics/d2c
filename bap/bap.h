@@ -13,25 +13,19 @@
 #include <map>
 #include <mutex>
 #include <set>
+#include <unordered_set>
+#include <unordered_map>
 using namespace std;
 
 #include "samReader.h"
 #include "saturation.h"
+#include "types.h"
 
 #include <filesystem>
 namespace fs = std::filesystem;
 
 
-struct Bedpe
-{
-    int start;
-    int end;
-    // string qname;
-    int qname1;
-    int qname2;
-    // string barcode;
-    int barcode;
-};
+
 
 struct SumStat
 {
@@ -100,17 +94,17 @@ private:
 
     // Shared data
     vector<vector<Bedpe>> _bedpes_by_chr;
-    map<int, int> _total_bead_quant;
+    unordered_map<int, int> _total_bead_quant;
     //vector<string> _total_bead_order;
     std::mutex _merge_chr_mutex;
-    set<int> _hq_beads;
+    unordered_set<int> _hq_beads;
     vector<map<int, int>> _total_nc_cnts;
     vector<map<size_t, int>> _total_bead_cnts;
-    map<int, string> _drop_barcodes;
+    unordered_map<int, string> _drop_barcodes;
     vector<string> _contig_names;
     vector<vector<string>> _dup_frags;
     vector<string> _final_frags;
-    vector<set<int>> _keep_qnames;
+    vector<unordered_set<int>> _keep_qnames;
     vector<map<string, pair<int, int>>> _frag_stats;
     vector<SumStat> _sum_stats;
 

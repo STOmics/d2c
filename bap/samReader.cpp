@@ -53,14 +53,14 @@ std::unique_ptr< SamReader > SamReader::FromFile(const std::string& reads_path)
         throw std::exception(error);
     }
 
-    if (hts_set_opt(fp, HTS_OPT_BLOCK_SIZE, _DEFAULT_HTS_BLOCK_SIZE) != 0)
-    {
-        char msg[128];
-        sprintf(msg, "Failed to set HTS_OPT_BLOCK_SIZE\n");
-        // printf(msg);
-        std::runtime_error error(msg);
-        throw std::exception(error);
-    }
+    // if (hts_set_opt(fp, HTS_OPT_BLOCK_SIZE, _DEFAULT_HTS_BLOCK_SIZE) != 0)
+    // {
+    //     char msg[128];
+    //     sprintf(msg, "Failed to set HTS_OPT_BLOCK_SIZE\n");
+    //     // printf(msg);
+    //     std::runtime_error error(msg);
+    //     throw std::exception(error);
+    // }
 
     bam_hdr_t* header = sam_hdr_read(fp);
     if (header == nullptr)

@@ -8,6 +8,7 @@
  */
 
 #include "saturation.h"
+#include "utility.h"
 
 #include <spdlog/spdlog.h>
 
@@ -16,6 +17,7 @@
 #include <random>
 #include <set>
 #include <sstream>
+#include <map>
 
 
 Saturation::Saturation()
@@ -30,14 +32,25 @@ Saturation::Saturation()
     _base2i['C'] = 1;
     _base2i['G'] = 2;
     _base2i['T'] = 3;
+
+    _chr_num = 0;
 }
 
 Saturation::~Saturation() {}
 
-int Saturation::addData(int start, int end, string barcode, int chr_id)
+int Saturation::addData(vector<Bedpe>& frags)
 {
-    string temp = barcode+_sep+to_string(start)+_sep+to_string(end)+_sep+to_string(chr_id);
-    _keys.push_back(temp);
+    FragData fd;
+    fd.chr = _chr_num;
+    for (auto& frag : frags)
+    {
+        fd.start = frag.start;
+        fd.end = frag.end;
+        fd.barcode = frag.barcode;
+        _keys.push_back(fd);
+    }
+
+    ++_chr_num;
 
     return 0;
 }
@@ -55,7 +68,8 @@ int Saturation::calculateSaturation(string out_file)
     std::mt19937       gen(rd());
     std::shuffle(_keys.begin(), _keys.end(), gen);
 
-    unordered_map< string, unordered_map< string, int > > data;
+    unordered_map< int, vector<unordered_map< size_t, int > > > data;
+    unordered_map< int, vector<unordered_map< size_t, int > > >::iterator it;
     size_t p = 0;
     for (size_t i = 1; i < _samples.size(); ++i)
     {
@@ -65,41 +79,68 @@ int Saturation::calculateSaturation(string out_file)
         size_t size = size_t(_samples[i] * _nreads);
         for (; p < size; ++p)
         {
-            string key = _keys[p];
-            size_t pos = key.find(_sep);
-            string barcode = key.substr(0, pos);
-            string value = key.substr(pos+1);
-            if (data.count(barcode) == 0)
-                data[barcode] = {};
-            ++data[barcode][value];
+            auto& frag = _keys[p];
+            int barcode = frag.barcode;
+            size_t value = ((size_t)frag.start << 32) + frag.end;
+            it = data.find(barcode);
+            if (it != data.end())
+            {
+                ++(it->second[frag.chr][value]);
+            }
+            else
+            {
+                data[barcode].resize(_chr_num, {});
+                ++data[barcode][frag.chr][value];
+            }
         }
 
         // Barcode
         size_t                   n_reads = 0;
         size_t                   n_uniq  = 0;
-        vector< int >            n_frags;
-        std::set< string > frags;
+        map< int, int > uniq_cnt;
         for (auto& b : data)
         {
-            frags.clear();
-            for (auto& p : b.second)
+            auto& frags = b.second;
+            int barcode_uniq = 0;
+            for (int i = 0; i < _chr_num; ++i)
             {
-                n_reads += p.second;
-                frags.insert(p.first);
-                ++n_uniq;
+                for (auto& p : frags[i])
+                {
+                    n_reads += p.second;
+                    ++barcode_uniq;
+                }
             }
-            n_frags.push_back(frags.size());
+            ++uniq_cnt[barcode_uniq];
         }
+        
         if (n_reads == 0)
         {
             spdlog::warn("Invalid data: n_reads == 0");
             continue;
         }
         
-        std::nth_element(n_frags.begin(), n_frags.begin() + n_frags.size() / 2, n_frags.end());
+        size_t median_num = 0;
+        for (auto& p : uniq_cnt)
+        {
+            n_uniq += p.first * p.second;
+            median_num += p.second;
+        }
+        
+        median_num /= 2;
+        size_t current_num = 0;
+        int median = 0;
+        for (auto& p : uniq_cnt)
+        {
+            current_num += p.second;
+            if (current_num >= median_num)
+            {
+                median = p.first;
+                break;
+            }
+        }
 
         ss << n_reads / data.size() << "\t" << 1 - (n_uniq * 1.0 / n_reads) << "\t"
-           << *(n_frags.begin() + n_frags.size() / 2) << std::endl;
+           << median << std::endl;
     }
     
     std::ofstream ofs(out_file, std::ofstream::out);
