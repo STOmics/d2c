@@ -1,5 +1,5 @@
 /*
- * File: bap.cpp
+ * File: d2c.cpp
  * Created Data: 2020-7-23
  * Author: fxzhao
  * Contact: <zhaofuxiang@genomics.cn>
@@ -7,7 +7,7 @@
  * Copyright (c) 2020 BGI
  */
 
-#include "bap.h"
+#include "d2c.h"
 
 
 #include "timer.h"
@@ -29,6 +29,21 @@
 
 const int FLAG = 2;
 const int MAX_INSERT = 2000;
+
+constexpr auto PLOT_SCRIPT = "19_makeKneePlots.R";
+constexpr auto BEAD_THRE_SCRIPT = "10b_knee_execute.R";
+constexpr auto JACCARD_THRE_SCRIPT = "11b_knee_execute.R";
+constexpr auto PARAM_FILE = ".d2cParam.csv";
+constexpr auto SAT_FILE = ".sequenceSaturation.tsv";
+constexpr auto FRAGMENT_FILE = ".fragments.tsv.gz";
+constexpr auto BASIC_QC_FILE = ".basicQC.tsv";
+constexpr auto BARCODE_QUANT_FILE = ".barcodeQuantSimple.csv";
+constexpr auto HQ_BEADS_FILE = ".HQbeads.tsv";
+constexpr auto JACCARD_TMP_FILE = ".jaccard.csv";
+constexpr auto IMPLICATED_BARCODES_FILE = ".implicatedBarcodes.csv.gz";
+constexpr auto BARCODE_TRANSLATE_FILE = ".barcodeTranslate.tsv";
+constexpr auto NC_STATS_FILE = ".NCsumstats.tsv";
+constexpr auto QC_STATS_FILE = ".QCstats.csv";
 
 #include "ygg.hpp"
 
@@ -143,7 +158,7 @@ int get_library_size(int t, int u)
     return round(u*(m+M)/2.0);
 }
 
-void Bap::extractBedPE(const BamRecord b1, const BamRecord b2, vector<Bedpe>& bedpes, int l1, int l2)
+void D2C::extractBedPE(const BamRecord b1, const BamRecord b2, vector<Bedpe>& bedpes, int l1, int l2)
 {
     // Initialize BEDPE variables
     string chrom1, chrom2, strand1, strand2;
@@ -232,7 +247,7 @@ void Bap::extractBedPE(const BamRecord b1, const BamRecord b2, vector<Bedpe>& be
     }
 }
 
-Bap::Bap(string input_bam, string output_path, string barcode_tag, int mapq, int cores, string run_name, bool tn5,
+D2C::D2C(string input_bam, string output_path, string barcode_tag, int mapq, int cores, string run_name, bool tn5,
         double min_barcode_frags, double min_jaccard_index, string ref, string mito_chr, string bed_genome_file,
         string blacklist_file, string trans_file, bool species_mix, string bin_path, double barcode_threshold,
         double jaccard_threshold, bool saturation_on, string barcode_list) :
@@ -263,7 +278,7 @@ Bap::Bap(string input_bam, string output_path, string barcode_tag, int mapq, int
     drop_tag = "DB";
 }
     
-int Bap::run()
+int D2C::run()
 {
     // Prepare
     // Make sure there is index of bam file
@@ -296,12 +311,12 @@ int Bap::run()
     return 0;
 }
 
-int Bap::taskflow()
+int D2C::taskflow()
 {
     tf::Executor executor;
     tf::Taskflow taskflow;
 
-    taskflow.name("Bap");
+    taskflow.name("D2C");
 
     // Step 1: split bam by chr
     auto samReader = SamReader::FromFile(input_bam);
@@ -337,7 +352,7 @@ int Bap::taskflow()
         used_chrs.end(),
         [&] (int chr_id) {
             Timer t;
-            Bap::splitBamByChr(chr_id);
+            D2C::splitBamByChr(chr_id);
             spdlog::info("Split bam by chr: {} time(s): {:.2f}", contigs[chr_id].first, t.toc(1000));
         }
     );
@@ -355,7 +370,7 @@ int Bap::taskflow()
         if (saturation_on)
         {
             Timer t;
-            fs::path sat_out_file = output_path / (run_name+".sequenceSaturation.tsv");
+            fs::path sat_out_file = output_path / (run_name + SAT_FILE);
             saturation.calculateSaturation(sat_out_file.string());
             spdlog::info("Sequencing saturation time(s): {:.2f}", t.toc(1000));
         }
@@ -367,7 +382,7 @@ int Bap::taskflow()
     {
         spdlog::debug("SplitBam memory(MB): {}", physical_memory_used_by_process());
         Timer t;
-        Bap::determineHQBeads();
+        D2C::determineHQBeads();
         spdlog::info("Determine high-quality beads time(s): {:.2f}", t.toc(1000));
     }).name("Determine HQ Beads");
     determine_hq_beads.succeed(T);
@@ -386,7 +401,7 @@ int Bap::taskflow()
             // Skip the mito chrom
             if (_contig_names[chr_id] == mito_chr) return;
             Timer t;
-            Bap::computeStatByChr(chr_id);
+            D2C::computeStatByChr(chr_id);
             spdlog::info("Compute stat by chr: {} time(s): {:.2f}", _contig_names[chr_id], t.toc(1000));
         }
     );
@@ -404,7 +419,7 @@ int Bap::taskflow()
     {
         spdlog::debug("ComputeByChr memory(MB): {}", physical_memory_used_by_process());
         Timer t;
-        Bap::determineBarcodeMerge();
+        D2C::determineBarcodeMerge();
         spdlog::info("Determine barcode merge time(s): {:.2f}", t.toc(1000));
     }).name("Determine Barcode Merge");
     barcode_merge.succeed(end_cal);
@@ -419,7 +434,7 @@ int Bap::taskflow()
         used_chrs.end(),
         [&] (int chr_id) {
             Timer t;
-            Bap::reannotateFragByChr(chr_id);
+            D2C::reannotateFragByChr(chr_id);
             spdlog::info("Reannotate frags by chr: {} time(s): {:.2f}", _contig_names[chr_id], t.toc(1000));
         }
     );
@@ -440,7 +455,7 @@ int Bap::taskflow()
             // Skip the mito chrom
             if (_contig_names[chr_id] == mito_chr) return;
             Timer t;
-            Bap::annotateBamByChr(chr_id);
+            D2C::annotateBamByChr(chr_id);
             spdlog::info("Annotate bam file by chr: {} time(s): {:.2f}", _contig_names[chr_id], t.toc(1000));
         }
     );
@@ -505,7 +520,7 @@ int Bap::taskflow()
             _dup_frags[chr_id].clear();
             _dup_frags[chr_id].shrink_to_fit();
         }
-        fs::path out_frag_file = output_path / (run_name+".fragments.tsv.gz");
+        fs::path out_frag_file = output_path / (run_name + FRAGMENT_FILE);
         spdlog::debug("Dump frags to: {}", out_frag_file.string());
         cmpFile out_frag;
         out_frag = cmpOpen(out_frag_file.c_str());
@@ -560,7 +575,7 @@ int Bap::taskflow()
             _sum_stats.push_back(ss);
         }
 
-        fs::path out_ss_file = output_path / (run_name+".basicQC.tsv");
+        fs::path out_ss_file = output_path / (run_name + BASIC_QC_FILE);
         FILE* out_ss;
         out_ss = fopen(out_ss_file.c_str(), "w");
         string header = "cell_barcode\ttotalNuclearFrags\tuniqueNuclearFrags\ttotalMitoFrags\tuniqueMitoFrags\n";
@@ -581,7 +596,7 @@ int Bap::taskflow()
     auto final_qc = taskflow.emplace([&] ()
     {
         Timer t;
-        Bap::finalQC();
+        D2C::finalQC();
         spdlog::info("Final qc time(s): {:.2f}", t.toc(1000));
     }).name("Final qc");
     final_qc.succeed(barcode_merge);
@@ -592,7 +607,7 @@ int Bap::taskflow()
     auto plot = taskflow.emplace([&] ()
     {
         Timer t;
-        Bap::plot();
+        D2C::plot();
         spdlog::info("Plot time(s): {:.2f}", t.toc(1000));
     }).name("Plot");
     plot.succeed(barcode_merge);
@@ -604,7 +619,7 @@ int Bap::taskflow()
     return 0;
 }
 
-int Bap::splitBamByChr(int chr_id)
+int D2C::splitBamByChr(int chr_id)
 {
     std::unique_ptr<SamReader> sr = SamReader::FromFile(input_bam);
     if (!sr->QueryByContig(chr_id)) return 0;
@@ -733,7 +748,7 @@ int Bap::splitBamByChr(int chr_id)
     return 0;
 }
 
-map<string, string> Bap::parseChrsFromBedFile()
+map<string, string> D2C::parseChrsFromBedFile()
 {
     map<string, string> chrs;
     ifstream ifs(bed_genome_file, std::ifstream::in);
@@ -748,7 +763,7 @@ map<string, string> Bap::parseChrsFromBedFile()
     return chrs;
 }
 
-pair<double, double> Bap::parseBeadThreshold(string filename)
+pair<double, double> D2C::parseBeadThreshold(string filename)
 {
     pair<double, double> res;
     ifstream ifs(filename, std::ifstream::in);
@@ -761,12 +776,12 @@ pair<double, double> Bap::parseBeadThreshold(string filename)
     return res;
 }
 
-int Bap::determineHQBeads()
+int D2C::determineHQBeads()
 {
     // Dump total bead quant to csv for call R script
     FILE * out_bead_quant;
     fs::path filename = output_path;
-    filename /= (run_name+".barcodeQuantSimple.csv"); 
+    filename /= (run_name+BARCODE_QUANT_FILE); 
     spdlog::debug("Dump bead quant to:{}", filename.string());
     out_bead_quant = fopen(filename.c_str(), "w");
     for (auto& b : _total_bead_quant)
@@ -780,12 +795,12 @@ int Bap::determineHQBeads()
 
     // TODO(fxzhao): change it to cpp
     // Call R script to calculate bead threshold
-    fs::path paras_file = output_path / (run_name+".bapParam.csv");
+    fs::path paras_file = output_path / (run_name + PARAM_FILE);
     ofstream ofs(paras_file.string(), std::ofstream::out);
     ofs.precision(15);
     if (min_barcode_frags == 0.0)
     {
-        fs::path script_path = bin_path / "10b_knee_execute.R";
+        fs::path script_path = bin_path / BEAD_THRE_SCRIPT;
         string command = "Rscript "+script_path.string()+" "+filename.string()+" 1 V2";
         vector<string> cmd_result;
         int cmd_rtn = exec_shell(command.c_str(), cmd_result);
@@ -831,7 +846,7 @@ int Bap::determineHQBeads()
             _hq_beads.insert(p.first);
     }
     // Export high-quality beads
-    fs::path out_hq_file = output_path / (run_name+".HQbeads.tsv");
+    fs::path out_hq_file = output_path / (run_name+HQ_BEADS_FILE);
     ofstream out_hq(out_hq_file.string(), std::ofstream::out);
     for (auto& b : _hq_beads)
         out_hq << int2Barcode(b) << "\n";
@@ -842,7 +857,7 @@ int Bap::determineHQBeads()
     return 0;
 }
 
-int Bap::computeStatByChr(int chr_id)
+int D2C::computeStatByChr(int chr_id)
 {
     spdlog::debug("in computeStatByChr: {}", _contig_names[chr_id]);
     // Filter fragments
@@ -947,7 +962,7 @@ inline string substrRight(string s, int n = 6)
 }
 
 // Example: ATCG,TCGA
-bool Bap::checkTn5(string s)
+bool D2C::checkTn5(string s)
 {
     if (!tn5) return true;
 
@@ -959,7 +974,7 @@ bool Bap::checkTn5(string s)
     return (substrRight(s1) == substrRight(s2));
 }
 // Example: int32int32
-bool Bap::checkTn5(size_t l)
+bool D2C::checkTn5(size_t l)
 {
     if (!tn5) return true;
 
@@ -968,7 +983,7 @@ bool Bap::checkTn5(size_t l)
     return (substrRight(s1) == substrRight(s2));
 }
 
-int Bap::determineBarcodeMerge()
+int D2C::determineBarcodeMerge()
 {
     spdlog::debug("tn5: {}", tn5);
     // Merge all barcode count
@@ -995,17 +1010,6 @@ int Bap::determineBarcodeMerge()
         count_dict[p.first] = p.second * 2;
     }
 
-    // Devel
-    // ifstream tmp("/hwfssz5/ST_BIGDATA/USER/zhaofuxiang/test_bap2/data2/bapfile/knee/Parotid_gland_20200520_AJ34.barcodeQuantSimple.csv");
-    // string line;
-    // while (std::getline(tmp, line))
-    // {
-    //     vector<string> vec_s = split_str(line, ',');
-        
-    //     if (_hq_beads.count(vec_s[0]) == 0) continue;
-    //     nBC.push_back({vec_s[0], stoi(vec_s[1])});
-    // }
-
     // Release memory of hq beads
     _hq_beads.clear();
 
@@ -1031,21 +1035,21 @@ int Bap::determineBarcodeMerge()
         return a.second > b.second;
     });
 
-    fs::path paras_file = output_path / (run_name+".bapParam.csv");
+    fs::path paras_file = output_path / (run_name + PARAM_FILE);
     ofstream ofs(paras_file.string(), std::ofstream::out | std::ofstream::app);
     ofs.precision(15);
     // Call knee if we need to
     if (min_jaccard_index == 0.0)
     {
         // Prepare jaccard frag data for calling R script
-        fs::path filename = output_path / (run_name+".jaccard.csv");
+        fs::path filename = output_path / (run_name+JACCARD_TMP_FILE);
         ofstream jaccard_out(filename.string(), std::ofstream::out);
         int size = min(1000000, int(ovdf.size()));
         for (int i = 0; i < size; ++i)
             jaccard_out<<ovdf[i].second<<"\n";
         jaccard_out.close();
 
-        fs::path script_path = bin_path / "11b_knee_execute.R";
+        fs::path script_path = bin_path / JACCARD_THRE_SCRIPT;
         string command = "Rscript "+script_path.string()+" "+filename.string()+" 1 V1";
         vector<string> cmd_result;
         int cmd_rtn = exec_shell(command.c_str(), cmd_result);
@@ -1082,7 +1086,7 @@ int Bap::determineBarcodeMerge()
 
     // Export the implicated barcodes
     cmpFile tbl_out;
-    fs::path implicated_barcode_file = output_path / (run_name+".implicatedBarcodes.csv.gz"); 
+    fs::path implicated_barcode_file = output_path / (run_name+IMPLICATED_BARCODES_FILE); 
     tbl_out = cmpOpen(implicated_barcode_file.c_str());
     string header = "barc1,barc2,N_both,N_barc1,N_barc2,jaccard_frag,merged\n";
     cmpFunc(tbl_out, header.c_str());
@@ -1180,7 +1184,7 @@ int Bap::determineBarcodeMerge()
     }
     
     FILE * bt;
-    fs::path barcode_translate_file = output_path / (run_name+".barcodeTranslate.tsv");
+    fs::path barcode_translate_file = output_path / (run_name+BARCODE_TRANSLATE_FILE);
     bt = fopen(barcode_translate_file.c_str(), "w");
     for (auto& p : _drop_barcodes)
     {
@@ -1200,7 +1204,7 @@ int Bap::determineBarcodeMerge()
     _total_nc_cnts.clear();
 
     FILE * nc_file_out;
-    fs::path nc_sum_file = output_path / (run_name+".NCsumstats.tsv");
+    fs::path nc_sum_file = output_path / (run_name+NC_STATS_FILE);
     nc_file_out = fopen(nc_sum_file.c_str(), "w");
     header = "NC_value\tNumberOfFragments\n";
     fwrite(header.c_str(), 1, header.size(), nc_file_out);
@@ -1231,7 +1235,7 @@ struct cmp
     }
 };
 
-int Bap::reannotateFragByChr(int chr_id)
+int D2C::reannotateFragByChr(int chr_id)
 {
     unordered_set<string> pcr_dup;
     unordered_set<int> qname_dup;
@@ -1277,7 +1281,7 @@ int Bap::reannotateFragByChr(int chr_id)
     return 0;
 }
 
-int Bap::annotateBamByChr(int chr_id)
+int D2C::annotateBamByChr(int chr_id)
 {
     auto& keep_reads = _keep_qnames[chr_id];
 
@@ -1324,7 +1328,7 @@ int Bap::annotateBamByChr(int chr_id)
     return 0;
 }
 
-int Bap::finalQC()
+int D2C::finalQC()
 {
     // Load tss file for finding overlaps
     ifstream tss_ifs(trans_file, std::ifstream::in);
@@ -1416,7 +1420,7 @@ int Bap::finalQC()
 
     // Export QC stats
     FILE * qc_out;
-    fs::path out_qc_file = output_path / (run_name+".QCstats.csv");
+    fs::path out_qc_file = output_path / (run_name+QC_STATS_FILE);
     qc_out = fopen(out_qc_file.c_str(), "w");
     string header = "DropBarcode,totalNuclearFrags,uniqueNuclearFrags,totalMitoFrags,uniqueMitoFrags,duplicateProportion,librarySize,meanInsertSize,medianInsertSize,tssProportion,FRIP\n";
     fwrite(header.c_str(), 1, header.size(), qc_out);
@@ -1439,12 +1443,12 @@ int Bap::finalQC()
     return 0;
 }
 
-int Bap::plot()
+int D2C::plot()
 {
-    fs::path script_path = bin_path / "19_makeKneePlots.R";
-    fs::path parameteter_file = output_path / (run_name+".bapParam.csv");
-    fs::path implicated_barcodes_file = output_path / (run_name+".implicatedBarcodes.csv.gz");
-    fs::path barcode_quant_file = output_path / (run_name+".barcodeQuantSimple.csv");
+    fs::path script_path = bin_path / PLOT_SCRIPT;
+    fs::path parameteter_file = output_path / (run_name + PARAM_FILE);
+    fs::path implicated_barcodes_file = output_path / (run_name+ IMPLICATED_BARCODES_FILE);
+    fs::path barcode_quant_file = output_path / (run_name+BARCODE_QUANT_FILE);
     string command = "Rscript "+script_path.string()+" "+parameteter_file.string()+" "+
                 barcode_quant_file.string()+" "+implicated_barcodes_file.string();
     vector<string> cmd_result;
@@ -1463,7 +1467,7 @@ int Bap::plot()
     return 0;
 }
 
-bool Bap::parseBarcodeList()
+bool D2C::parseBarcodeList()
 {
     ifstream ifs(barcode_list, std::ifstream::in);
     string line;
@@ -1477,7 +1481,7 @@ bool Bap::parseBarcodeList()
     return true;
 }
 
-inline string Bap::int2Barcode(int i)
+inline string D2C::int2Barcode(int i)
 {
     //spdlog::debug("i: {}", i);
     string res = _barcode_names[i >> 16] + _barcode_names[i & 0xFFFF];

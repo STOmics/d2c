@@ -8,7 +8,7 @@ set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
 set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib")
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TURE)
 
-project(BAP)
+project(D2C)
 
 #set(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O3 ")
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
@@ -17,8 +17,8 @@ project(BAP)
 
 if ( UNITTEST STREQUAL "OFF" )
     # the main project
-    add_subdirectory(bap)
-    message(STATUS "Compile bap")
+    add_subdirectory(d2c)
+    message(STATUS "Compile D2C")
 else()
     # the unittest project
     add_subdirectory(test)

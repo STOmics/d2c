@@ -1,5 +1,5 @@
 /*
- * File: bap.h
+ * File: d2c.h
  * Created Data: 2020-7-23
  * Author: fxzhao
  * Contact: <zhaofuxiang@genomics.cn>
@@ -38,14 +38,14 @@ struct SumStat
     string drop_barcode;
 };
 
-class Bap
+class D2C
 {
 public:
-    Bap(string input_bam, string output_path, string barcode_tag, int mapq, int cores, string run_name, bool tn5,
+    D2C(string input_bam, string output_path, string barcode_tag, int mapq, int cores, string run_name, bool tn5,
         double min_barcode_frags, double min_jaccard_index, string ref, string mito_chr, string bed_genome_file,
         string blacklist_file, string trans_file, bool species_mix, string bin_path, double barcode_threshold,
         double jaccard_threshold, bool saturation_on, string barcode_list);
-    ~Bap() {};
+    ~D2C() {};
     int run();
     int taskflow();
     int splitBamByChr(int chr_id);

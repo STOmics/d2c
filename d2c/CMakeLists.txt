@@ -13,7 +13,7 @@ link_directories(${INSTALL_PATH}/lib)
 
 set (src
     utility.cpp
-    bap.cpp
+    d2c.cpp
     samReader.cpp
     bamCat.cpp
     saturation.cpp
@@ -22,7 +22,7 @@ set (src
     )
 
 set(EXECUTABLE_OUTPUT_PATH ${INSTALL_PATH}/bin)
-add_executable(app_bap ${src})
+add_executable(app ${src})
 #add_definitions(-DTIMING)
 #add_definitions(-DDEBUG_)
 
@@ -30,11 +30,11 @@ add_executable(app_bap ${src})
 # set CLI11_HAS_FILESYSTEM=0 for prevent using std::filesystem
 add_definitions(-DCLI11_HAS_FILESYSTEM=0)
 
-target_link_libraries(app_bap
+target_link_libraries(app
     z
     bz2
     hts
     )
 
-set_target_properties(app_bap PROPERTIES OUTPUT_NAME "bap")
+set_target_properties(app PROPERTIES OUTPUT_NAME "d2c")
 install(FILES 11b_knee_execute.R 10b_knee_execute.R 00_knee_CL.R 19_makeKneePlots.R DESTINATION bin)

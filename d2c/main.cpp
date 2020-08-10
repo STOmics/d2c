@@ -8,7 +8,7 @@
  */
 
 #include <taskflow/taskflow.hpp>
-#include "bap.h"
+#include "d2c.h"
 
 #include <ctime>
 
@@ -27,16 +27,16 @@ namespace fs = std::filesystem;
 
 #include "timer.h"
 
-static const std::string version = "1.0.0";
-
 //#define DEVEL
+constexpr auto APP_NAME = "D2C";
+constexpr auto APP_VERSION = "1.0.0";
 
 int main(int argc, char** argv)
 {
     Timer timer;
     // Parse the command line parameters.
-    CLI::App app{"BAP: process scATAC data."};
-    app.footer("BAP version: " + version);
+    CLI::App app{string(APP_NAME) + ": Drop to Cell."};
+    app.footer(string(APP_NAME) + " version: " + APP_VERSION);
     app.get_formatter()->column_width(40);
 
     // Required parameters
@@ -168,7 +168,7 @@ int main(int argc, char** argv)
     // Set the default logger to file logger.
     std::time_t        t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::ostringstream ostr;
-    ostr << "Bap_" << std::put_time(std::localtime(&t), "%Y%m%d_%H%M%S") << ".log";
+    ostr << APP_NAME << "_" << std::put_time(std::localtime(&t), "%Y%m%d_%H%M%S") << ".log";
     try
     {
         // auto file_logger = spdlog::basic_logger_mt("main", "logs/" + ostr.str());
@@ -197,13 +197,13 @@ int main(int argc, char** argv)
         blacklist_file, trans_file, species_mix, barcode_threshold, jaccard_threshold,
         saturation_on, barcode_list);
 
-    Bap bap = Bap(input_bam, output_path, barcode_tag, mapq, cores, run_name, tn5,
+    D2C d2c = D2C(input_bam, output_path, barcode_tag, mapq, cores, run_name, tn5,
         min_barcode_frags, min_jaccard_index, ref, mito_chr, bed_genome_file,
         blacklist_file, trans_file, species_mix, exe_path.string(), barcode_threshold,
         jaccard_threshold, saturation_on, barcode_list);
     try
     {
-        bap.run();
+        d2c.run();
     }
     catch (std::exception& e)
     {
@@ -215,7 +215,7 @@ int main(int argc, char** argv)
     }
 
     cout<<"Finish process."<<endl;
-    spdlog::get("main")->info("Bap process done. Elapsed time(s):{:.2f}", timer.toc(1000));
+    spdlog::get("main")->info("{} process done. Elapsed time(s):{:.2f}", APP_NAME, timer.toc(1000));
 
 
     return 0;
