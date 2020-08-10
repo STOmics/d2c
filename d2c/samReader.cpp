@@ -97,7 +97,7 @@ bool SamReader::QueryByContig(int tid)
     iter_ = sam_itr_queryi(idx_, tid, 0, ref_[tid].second);
     if (iter_ == nullptr || iter_->finished)
     {
-        spdlog::debug("No reads for ref:{}", ref_[tid].first);
+        //spdlog::debug("No reads for ref:{}", ref_[tid].first);
         return false;
     }
     return true;

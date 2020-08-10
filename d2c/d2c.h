@@ -44,7 +44,7 @@ public:
     D2C(string input_bam, string output_path, string barcode_tag, int mapq, int cores, string run_name, bool tn5,
         double min_barcode_frags, double min_jaccard_index, string ref, string mito_chr, string bed_genome_file,
         string blacklist_file, string trans_file, bool species_mix, string bin_path, double barcode_threshold,
-        double jaccard_threshold, bool saturation_on, string barcode_list);
+        double jaccard_threshold, bool saturation_on, string barcode_list, string barcode_runname_list);
     ~D2C() {};
     int run();
     int taskflow();
@@ -65,6 +65,8 @@ private:
     bool checkTn5(size_t l);
     bool parseBarcodeList();
     inline string int2Barcode(int i);
+    inline string int2Runname(int i);
+    bool parseRunnameList();
 
 private:
     // Input parameters
@@ -83,6 +85,7 @@ private:
     double barcode_threshold, jaccard_threshold;
     bool saturation_on;
     string barcode_list;
+    string barcode_runname_list;
 
     // Specific parameters;
     int nc_threshold;   // Number of barcodes that a paired-end read must be observed for the read to be filtered
@@ -114,4 +117,9 @@ private:
     // Barcode list data, for encoding and decodeing barcode strings
     vector<string> _barcode_names;
     unordered_map<string, int> _barcode2int;
+
+    // Barcode runnames, just keep run name in bead barcodes
+    // Note: runnames starts with '-', and the string in first position is empty string
+    vector<string> _runnames;
+    unordered_map<string, int> _runname2int; 
 };
