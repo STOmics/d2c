@@ -26,6 +26,8 @@
 #include <thread>
 #include <tuple>
 
+// Control the standart of uniq fragments, BOTH mean start and end are both equal
+//#define UNIQ_FRAG_BOTH
 
 // Samtools view's parameter
 const int FLAG = 2;
@@ -928,6 +930,7 @@ int D2C::computeStatByChr(int chr_id)
 
     set<string> uniq_frags;
     map<int, vector<int>> overlap_start, overlap_end;
+    map<size_t, vector<int>> overlap_both;
     for (size_t i = 0; i < frags_pos.size(); ++i)
     {
         if (!frags_pos[i]) continue;
@@ -940,13 +943,22 @@ int D2C::computeStatByChr(int chr_id)
         if (uniq_frags.count(key) != 0) continue;
 
         uniq_frags.insert(key);
+
+#ifdef UNIQ_FRAG_BOTH
+        overlap_both[((size_t)start << 32) + end].push_back(barcode);
+#else
         overlap_start[start].push_back(barcode);
         overlap_end[end].push_back(barcode);
+#endif
     }
    
     // Double to consider left and right inserts
     map<size_t, int> bead_cnts;
+#ifdef UNIQ_FRAG_BOTH
+    for (auto& overlap : {overlap_both})
+#else
     for (auto& overlap : {overlap_start, overlap_end})
+#endif
     {
         for (auto& p : overlap)
         {
