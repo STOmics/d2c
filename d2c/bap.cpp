@@ -13,7 +13,7 @@
 #include "timer.h"
 #include "utility.h"
 #include "bamCat.h"
-#include "gz_io.h"
+#include "gzIO.h"
 
 
 #include <spdlog/spdlog.h>

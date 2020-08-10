@@ -1,5 +1,5 @@
 /*
- * File: gz_io.cpp
+ * File: gzIO.cpp
  * Created Data: 2020-7-9
  * Author: fxzhao
  * Contact: <zhaofuxiang@genomics.cn>
@@ -7,7 +7,7 @@
  * Copyright (c) 2020 BGI
  */
 
-#include "gz_io.h"
+#include "gzIO.h"
 #include <iostream>
 
 bool readline(gzFile f, string & l, int len)

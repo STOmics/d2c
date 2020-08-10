@@ -12,15 +12,7 @@ set(CMAKE_CXX_FLAGS "-std=c++17 -g -ggdb -gstabs+ -pedantic -fopenmp -lpthread -
 link_directories(${INSTALL_PATH}/lib)
 
 set (src
-    # assemble_fragments.cpp
-    # annotate_fragments.cpp
-    # gz_io.cpp
-    # compute_bap_stat_chr.cpp
     utility.cpp
-    # determine_barcode_merges.cpp
-    # reannotate_fragments_get_summary_stats_chr.cpp
-    # reannotate_bam_file.cpp
-    # final_qc_se.cpp
     bap.cpp
     samReader.cpp
     bamCat.cpp

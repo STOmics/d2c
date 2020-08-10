@@ -1,5 +1,5 @@
 /*
- * File: gz_io.h
+ * File: gzIO.h
  * Created Data: 2020-7-9
  * Author: fxzhao
  * Contact: <zhaofuxiang@genomics.cn>
