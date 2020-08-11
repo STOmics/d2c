@@ -18,7 +18,6 @@ using namespace std;
 
 #include "types.h"
 
-
 struct FragData
 {
     int barcode;
@@ -34,17 +33,17 @@ public:
     ~Saturation();
 
     // Parse raw data to vectors
-    int addData(vector<Bedpe>& frags);
+    int addData(vector< Bedpe >& frags);
 
     // Calculate sequencing saturation
     int calculateSaturation(string out_file);
 
 private:
-    vector< FragData >                 _keys;  // Unique name, composed of barcode, gene and umi
-    int                              _base2i[128];
-    size_t _nreads;
-    char _sep;
-    vector< float > _samples;
+    vector< FragData > _keys;  // Unique name, composed of barcode, gene and umi
+    int                _base2i[128];
+    size_t             _nreads;
+    char               _sep;
+    vector< float >    _samples;
 
     int _chr_num;
 };

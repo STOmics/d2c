@@ -13,9 +13,9 @@ struct Bedpe
 {
     int start;  // start and end positions for this fragment
     int end;
-    
-    int qname1; // record reads position for keep reads in bam
+
+    int qname1;  // record reads position for keep reads in bam
     int qname2;
-    
-    int barcode; // encode runname,bc1,bc2 to int32: 8+12+12
+
+    int barcode;  // encode runname,bc1,bc2 to int32: 8+12+12
 };

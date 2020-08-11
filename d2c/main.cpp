@@ -7,8 +7,8 @@
  * Copyright (c) 2020 BGI
  */
 
-#include <taskflow/taskflow.hpp>
 #include "d2c.h"
+#include <taskflow/taskflow.hpp>
 
 #include <ctime>
 
@@ -28,14 +28,14 @@ namespace fs = std::filesystem;
 #include "timer.h"
 
 //#define DEVEL
-constexpr auto APP_NAME = "D2C";
+constexpr auto APP_NAME    = "D2C";
 constexpr auto APP_VERSION = "1.0.0";
 
 int main(int argc, char** argv)
 {
     Timer timer;
     // Parse the command line parameters.
-    CLI::App app{string(APP_NAME) + ": Drop to Cell."};
+    CLI::App app{ string(APP_NAME) + ": Drop to Cell." };
     app.footer(string(APP_NAME) + " version: " + APP_VERSION);
     app.get_formatter()->column_width(40);
 
@@ -62,7 +62,7 @@ int main(int argc, char** argv)
     app.add_option("--bf", min_barcode_frags, "Minimum number of fragments to be thresholded for doublet merging");
     double min_jaccard_index = 0.0;
     app.add_option("--ji", min_jaccard_index, "Minimum jaccard index for collapsing bead barcodes to cell barcodes");
-    
+
     // Model organism
     string ref = "hg19";
     app.add_option("-r", ref, "Specify supported reference genome, default hg19");
@@ -76,9 +76,13 @@ int main(int argc, char** argv)
 
     // Specific parameters
     double barcode_threshold = 0.1;
-    app.add_option("--bp", barcode_threshold, "Percentage of minimum number of fragments to be thresholded for doublet merging")->check(CLI::Range(0.0,1.0));
+    app.add_option("--bp", barcode_threshold,
+                   "Percentage of minimum number of fragments to be thresholded for doublet merging")
+        ->check(CLI::Range(0.0, 1.0));
     double jaccard_threshold = 0.3;
-    app.add_option("--jp", jaccard_threshold, "Percentage of minimum jaccard index for collapsing bead barcodes to cell barcodes")->check(CLI::Range(0.0,1.0));
+    app.add_option("--jp", jaccard_threshold,
+                   "Percentage of minimum jaccard index for collapsing bead barcodes to cell barcodes")
+        ->check(CLI::Range(0.0, 1.0));
 
     bool saturation_on = false;
     app.add_flag("--sat", saturation_on, "Output sequencing saturation file, default False");
@@ -89,46 +93,50 @@ int main(int argc, char** argv)
     CLI11_PARSE(app, argc, argv);
 
     // Make sure the parameters are valid
-    if (cores <= 0) cores = std::thread::hardware_concurrency();
-    if (run_name.empty()) run_name = fs::path(input_bam).stem().string();
-    fs::path exe_path = argv[0];
-    exe_path = fs::absolute(exe_path).parent_path();
-    fs::path ref_path = exe_path / "anno";
-    set<string> supported_genomes;
+    if (cores <= 0)
+        cores = std::thread::hardware_concurrency();
+    if (run_name.empty())
+        run_name = fs::path(input_bam).stem().string();
+    fs::path exe_path      = argv[0];
+    exe_path               = fs::absolute(exe_path).parent_path();
+    fs::path      ref_path = exe_path / "anno";
+    set< string > supported_genomes;
     for (auto& p : fs::directory_iterator(ref_path / "bedtools"))
     {
         fs::path filename = p.path().filename();
-        if (filename.extension() != ".sizes") continue;
+        if (filename.extension() != ".sizes")
+            continue;
         string name = filename.stem().string();
-        if (name.substr(0, 6) == "chrom_") supported_genomes.insert(name.substr(6));
+        if (name.substr(0, 6) == "chrom_")
+            supported_genomes.insert(name.substr(6));
     }
     // Check jaccard index is valid
     if (min_jaccard_index > 1 || min_jaccard_index < 0)
     {
-        cout<<"User specified jaccard index > 1 or < 0:"<<min_jaccard_index<<endl;
+        cout << "User specified jaccard index > 1 or < 0:" << min_jaccard_index << endl;
     }
     // Handle reference genome
     if (supported_genomes.count(ref) != 0)
     {
-        cout<<"Found designated reference genome:"<<ref<<endl;
+        cout << "Found designated reference genome:" << ref << endl;
         if (trans_file.empty())
-            trans_file = ref_path/"TSS"/(ref+".refGene.TSS.bed");
+            trans_file = ref_path / "TSS" / (ref + ".refGene.TSS.bed");
         if (blacklist_file.empty())
-            blacklist_file = ref_path/"blacklist"/(ref+".full.blacklist.bed");
+            blacklist_file = ref_path / "blacklist" / (ref + ".full.blacklist.bed");
         if (bed_genome_file.empty())
-            bed_genome_file = ref_path/"bedtools"/("chrom_"+ref+".sizes");
+            bed_genome_file = ref_path / "bedtools" / ("chrom_" + ref + ".sizes");
     }
     else
     {
-        cout<<"Could not identify this reference genome:"<<ref<<endl;
-        cout<<"Attempting to infer necessary input files from user specification"<<endl;
+        cout << "Could not identify this reference genome:" << ref << endl;
+        cout << "Attempting to infer necessary input files from user specification" << endl;
         if (bed_genome_file.empty() || blacklist_file.empty() || trans_file.empty())
         {
-            cout<<"Invalid parameters:--bg --bl --ts"<<endl;
+            cout << "Invalid parameters:--bg --bl --ts" << endl;
             exit(1);
         }
     }
-    
+
     // Make sure mito chr is valid
     if (mito_chr.empty())
     {
@@ -146,7 +154,7 @@ int main(int argc, char** argv)
     {
         if (!fs::create_directories(fs::path(output_path)))
         {
-            cout<<"Failed to create directory: "<<output_path<<endl;
+            cout << "Failed to create directory: " << output_path << endl;
             exit(1);
         }
     }
@@ -154,20 +162,21 @@ int main(int argc, char** argv)
     // Devel
 #ifdef DEVEL
     for (auto& g : supported_genomes)
-        cout<<g<<endl;
-    cout<<"cpu cores:"<<cores<<endl;
-    cout<<"run name:"<<run_name<<endl;
-    cout<<"bedtools:"<<bed_genome_file<<endl;
-    cout<<"blacklist:"<<blacklist_file<<endl;
-    cout<<"TSS:"<<trans_file<<endl;
-    cout<<"mito chr:"<<mito_chr<<endl;
+        cout << g << endl;
+    cout << "cpu cores:" << cores << endl;
+    cout << "run name:" << run_name << endl;
+    cout << "bedtools:" << bed_genome_file << endl;
+    cout << "blacklist:" << blacklist_file << endl;
+    cout << "TSS:" << trans_file << endl;
+    cout << "mito chr:" << mito_chr << endl;
 #endif
 
     // Figure out if the specified reference genome is a species mix
-    set<string> mix_species{"hg19-mm10", "hg19_mm10_c", "hg19-mm10_nochr"};
-    bool species_mix = false;
-    if (mix_species.count(ref) != 0) species_mix = true;
-    
+    set< string > mix_species{ "hg19-mm10", "hg19_mm10_c", "hg19-mm10_nochr" };
+    bool          species_mix = false;
+    if (mix_species.count(ref) != 0)
+        species_mix = true;
+
     // Set the default logger to file logger.
     std::time_t        t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::ostringstream ostr;
@@ -175,7 +184,7 @@ int main(int argc, char** argv)
     try
     {
         // auto file_logger = spdlog::basic_logger_mt("main", "logs/" + ostr.str());
-        auto file_sink      = std::make_shared< spdlog::sinks::basic_file_sink_mt >(exe_path/"logs"/ostr.str());
+        auto file_sink      = std::make_shared< spdlog::sinks::basic_file_sink_mt >(exe_path / "logs" / ostr.str());
         auto main_logger    = std::make_shared< spdlog::logger >("main", file_sink);
         auto process_logger = std::make_shared< spdlog::logger >("process", file_sink);
         spdlog::register_logger(main_logger);
@@ -191,19 +200,18 @@ int main(int argc, char** argv)
     spdlog::set_pattern("%Y-%m-%d %H:%M:%S.%e %L %n: %v");
 
     spdlog::get("main")->info("{} input_bam:{} output_path:{} barcode_tag:{} "
-        "mapq:{} cores:{} run_name:{} tn5:{} min_barcode_frags:{} min_jaccard_index:{} "
-        "ref:{} mito_chr:{} bed_genome_file:{} blacklist_file:{} trans_file:{} "
-        "species_mix:{} barcode_threshold:{} jaccard_threshold:{} saturation_on:{} "
-        "barcode_list:{} barcode_runname_list:{}",
-        argv[0], input_bam, output_path, barcode_tag, mapq, cores, run_name, tn5,
-        min_barcode_frags, min_jaccard_index, ref, mito_chr, bed_genome_file,
-        blacklist_file, trans_file, species_mix, barcode_threshold, jaccard_threshold,
-        saturation_on, barcode_list, barcode_runname_list);
+                              "mapq:{} cores:{} run_name:{} tn5:{} min_barcode_frags:{} min_jaccard_index:{} "
+                              "ref:{} mito_chr:{} bed_genome_file:{} blacklist_file:{} trans_file:{} "
+                              "species_mix:{} barcode_threshold:{} jaccard_threshold:{} saturation_on:{} "
+                              "barcode_list:{} barcode_runname_list:{}",
+                              argv[0], input_bam, output_path, barcode_tag, mapq, cores, run_name, tn5,
+                              min_barcode_frags, min_jaccard_index, ref, mito_chr, bed_genome_file, blacklist_file,
+                              trans_file, species_mix, barcode_threshold, jaccard_threshold, saturation_on,
+                              barcode_list, barcode_runname_list);
 
-    D2C d2c = D2C(input_bam, output_path, barcode_tag, mapq, cores, run_name, tn5,
-        min_barcode_frags, min_jaccard_index, ref, mito_chr, bed_genome_file,
-        blacklist_file, trans_file, species_mix, exe_path.string(), barcode_threshold,
-        jaccard_threshold, saturation_on, barcode_list, barcode_runname_list);
+    D2C d2c = D2C(input_bam, output_path, barcode_tag, mapq, cores, run_name, tn5, min_barcode_frags, min_jaccard_index,
+                  ref, mito_chr, bed_genome_file, blacklist_file, trans_file, species_mix, exe_path.string(),
+                  barcode_threshold, jaccard_threshold, saturation_on, barcode_list, barcode_runname_list);
     try
     {
         d2c.run();
@@ -217,9 +225,8 @@ int main(int argc, char** argv)
         spdlog::error("Unknown error");
     }
 
-    cout<<"Finish process."<<endl;
+    cout << "Finish process." << endl;
     spdlog::get("main")->info("{} process done. Elapsed time(s):{:.2f}", APP_NAME, timer.toc(1000));
-
 
     return 0;
 }

@@ -11,16 +11,19 @@ htslibPath="$libPath/htslib-1.9"
 yggPath="$libPath/ygg-master"
 doctestPath="$libPath/doctest-2.3.7"
 taskflowPath="$libPath/taskflow-2.5.0"
+fftwPath="$libPath/fftw-3.3.8"
 
 binPath="/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/bin"
 export PATH="$gccPath/bin:$cmakePath/bin:$binPath"
 #echo $PATH
 
+export LD_LIBRARY_PATH="$fftwPath/lib:$LD_LIBRARY_PATH"
 export LD_LIBRARY_PATH="$libdeflatePath/lib:$htslibPath/lib:$gccPath/lib64:$LD_LIBRARY_PATH"
 export LD_LIBRARY_PATH="/lib64:$LD_LIBRARY_PATH"
 export LIBRARY_PATH=$LD_LIBRARY_PATH
 #echo $LD_LIBRARY_PATH
 
+export C_INCLUDE_PATH="$fftwPath/include:$C_INCLUDE_PATH"
 export C_INCLUDE_PATH="$doctestPath/include:$C_INCLUDE_PATH"
 export C_INCLUDE_PATH="$libdeflatePath/include:$yggPath/include:$C_INCLUDE_PATH"
 export C_INCLUDE_PATH="$htslibPath/include:$gccPath/include:$C_INCLUDE_PATH"

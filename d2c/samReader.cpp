@@ -29,8 +29,7 @@ namespace fs = std::filesystem;
 #include "timer.h"
 
 // Class Implementations.
-const int            _DEFAULT_HTS_BLOCK_SIZE = 128 * (1024 * 1024);
-
+const int _DEFAULT_HTS_BLOCK_SIZE = 128 * (1024 * 1024);
 
 // Class SamReader's functions.
 SamReader::~SamReader()
@@ -97,7 +96,7 @@ bool SamReader::QueryByContig(int tid)
     iter_ = sam_itr_queryi(idx_, tid, 0, ref_[tid].second);
     if (iter_ == nullptr || iter_->finished)
     {
-        //spdlog::debug("No reads for ref:{}", ref_[tid].first);
+        // spdlog::debug("No reads for ref:{}", ref_[tid].first);
         return false;
     }
     return true;
@@ -126,8 +125,8 @@ bool SamReader::next(BamRecord b, int flag)
 {
     while (sam_itr_next(fp_, iter_, b) > 0)
     {
-        //spdlog::debug("flag:{} qual:{}", b->core.flag, b->core.qual);
-        if ((b->core.flag & flag) == flag) 
+        // spdlog::debug("flag:{} qual:{}", b->core.flag, b->core.qual);
+        if ((b->core.flag & flag) == flag)
             return true;
     }
     return false;

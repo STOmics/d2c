@@ -15,9 +15,9 @@
 #define cmpFile gzFile
 #define cmpOpen(x) gzopen(x, "wb")
 #define cmpClose(x) gzclose(x)
-#define cmpFunc(x,y) gzputs(x,y)
+#define cmpFunc(x, y) gzputs(x, y)
 
 #include <string>
 using namespace std;
 
-bool readline(gzFile f, string & l, int len=128);
+bool readline(gzFile f, string& l, int len = 128);

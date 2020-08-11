@@ -9,6 +9,7 @@ set(SRC_PATH ${PROJECT_SOURCE_DIR})
 set(CMAKE_CXX_FLAGS "-std=c++17 -g -ggdb -gstabs+ -pedantic -fopenmp -lpthread -lrt")
 
 
+include_directories(../)
 link_directories(${INSTALL_PATH}/lib)
 
 set (src
@@ -31,6 +32,7 @@ add_executable(app ${src})
 add_definitions(-DCLI11_HAS_FILESYSTEM=0)
 
 target_link_libraries(app
+    density
     z
     bz2
     hts

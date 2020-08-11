@@ -8,8 +8,8 @@
  */
 
 #include "utility.h"
-#include <sstream>
 #include <iomanip>
+#include <sstream>
 
 #include <string.h>
 #ifdef _WIN32
@@ -21,10 +21,10 @@
 #include <unistd.h>
 #endif
 
-vector<string> split_str(const std::string& str, char delim, bool skip_empty)
+vector< string > split_str(const std::string& str, char delim, bool skip_empty)
 {
     std::istringstream iss(str);
-    vector<string> res;
+    vector< string >   res;
     for (std::string item; getline(iss, item, delim);)
         if (skip_empty && item.empty())
             continue;
@@ -33,18 +33,18 @@ vector<string> split_str(const std::string& str, char delim, bool skip_empty)
     return res;
 }
 
-float round(float f, int bits) 
-{ 
-    stringstream ss; 
-    ss << fixed << setprecision(bits) << f; 
-    ss >> f; 
+float round(float f, int bits)
+{
+    stringstream ss;
+    ss << fixed << setprecision(bits) << f;
+    ss >> f;
     return f;
 }
 
 string f2str(float f, int bits)
 {
-    stringstream ss; 
-    ss << fixed << setprecision(bits) << f; 
+    stringstream ss;
+    ss << fixed << setprecision(bits) << f;
     return ss.str();
 }
 

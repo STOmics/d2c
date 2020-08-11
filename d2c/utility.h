@@ -9,11 +9,11 @@
 
 #pragma once
 
-#include <vector>
 #include <string>
+#include <vector>
 using namespace std;
 
-vector<string> split_str(const std::string& str, char delim=' ', bool skip_empty=true);
+vector< string > split_str(const std::string& str, char delim = ' ', bool skip_empty = true);
 
 float round(float src, int bits);
 
