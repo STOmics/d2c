@@ -195,8 +195,8 @@ int main(int argc, char** argv)
     {
         std::cout << "Log init failed: " << ex.what() << std::endl;
     }
-    spdlog::set_level(spdlog::level::debug);  // Set global log level.
-    spdlog::flush_on(spdlog::level::debug);
+    spdlog::set_level(spdlog::level::info);  // Set global log level.
+    spdlog::flush_on(spdlog::level::info);
     spdlog::set_pattern("%Y-%m-%d %H:%M:%S.%e %L %n: %v");
 
     spdlog::get("main")->info("{} input_bam:{} output_path:{} barcode_tag:{} "

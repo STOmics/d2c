@@ -16,8 +16,8 @@
 #include "utility.h"
 
 #include <spdlog/spdlog.h>
-
 #include <taskflow/taskflow.hpp>
+#include <sparsepp/spp.h>
 
 #include <algorithm>
 #include <exception>
@@ -626,6 +626,29 @@ int D2C::taskflow()
     return 0;
 }
 
+
+bool operator< (const UniqBarcode& lhs, const UniqBarcode& rhs)
+{
+    if (lhs.start < rhs.start)
+        return true;
+    else if (lhs.start > rhs.start)
+        return false;
+    else
+    {
+        if (lhs.end < rhs.end)
+            return true;
+        else if (lhs.end > rhs.end)
+            return false;
+        else
+        {
+            if (lhs.barcode < rhs.barcode)
+                return true;
+            else
+                return false;
+        }
+    }
+}
+
 int D2C::splitBamByChr(int chr_id)
 {
     std::unique_ptr< SamReader > sr = SamReader::FromFile(input_bam);
@@ -666,6 +689,7 @@ int D2C::splitBamByChr(int chr_id)
         bam_destroy1(p.second.first);
     pe_dict.clear();
     spdlog::debug("chr: {} frags size: {}", _contig_names[chr_id], bedpes.size());
+    spdlog::debug("chr: {} memory(MB): {}", _contig_names[chr_id], physical_memory_used_by_process());
 
     // Devel
     // if (chr_str == "chrMT")
@@ -704,7 +728,9 @@ int D2C::splitBamByChr(int chr_id)
         mytree.insert(node);
     }
 
-    unordered_set< string > pcr_dup;
+    // set< UniqBarcode > pcr_dup;
+    spp::sparse_hash_set<UniqBarcode> pcr_dup;
+    //unordered_set<string> pcr_dup;
     // Quantify the number of unique fragments per barcode
     unordered_map< int, int > bead_quant;
     // vector<string> bead_order;
@@ -721,15 +747,22 @@ int D2C::splitBamByChr(int chr_id)
             continue;
 
         int    barcode = b.barcode;
-        string key     = to_string(start) + '\t' + to_string(end) + '\t' + to_string(barcode);
-        if (pcr_dup.count(key) == 0)
+        // string key     = to_string(start) + '\t' + to_string(end) + '\t' + to_string(barcode);
+        UniqBarcode ub;
+        ub.start = start;
+        ub.end = end;
+        ub.barcode = barcode;
+        if (pcr_dup.count(ub) == 0)
         {
-            pcr_dup.insert(key);
+            pcr_dup.insert(ub);
             ++bead_quant[barcode];
         }
     }
+    spdlog::debug("prc dup size: {}", pcr_dup.size());
     pcr_dup.clear();
-
+    
+    //unordered_set<string>().swap(pcr_dup);
+   
     // Devel
     // if (chr_str == "chrMT")
     // {
@@ -750,7 +783,7 @@ int D2C::splitBamByChr(int chr_id)
     std::lock_guard< std::mutex > guard(_merge_chr_mutex);
     for (auto& b : bead_quant)
         _total_bead_quant[b.first] += b.second;
-
+    spdlog::debug("_total_bead_quant size: {}", _total_bead_quant.size());
     // Merge frags data for sequencing saturation
     if (saturation_on)
     {
@@ -844,6 +877,8 @@ int D2C::determineHQBeads()
         auto paras            = kde.run(cnts, "bead");
         min_barcode_frags     = paras.first;
         double call_threshold = paras.second;
+        // min_barcode_frags     = 500;
+        // double call_threshold = 500;
 
         ofs << "bead_threshold_nosafety," << call_threshold << endl;
     }
@@ -887,6 +922,7 @@ int D2C::determineHQBeads()
 int D2C::computeStatByChr(int chr_id)
 {
     spdlog::debug("in computeStatByChr: {}", _contig_names[chr_id]);
+    spdlog::debug("chr: {} memory(MB): {}", _contig_names[chr_id], physical_memory_used_by_process());
     // Filter fragments
     unordered_map< unsigned long long, int > dict;
     auto&                                    frags_data = _bedpes_by_chr[chr_id];
@@ -907,6 +943,8 @@ int D2C::computeStatByChr(int chr_id)
 
         frags_pos[i] = true;
     }
+    spdlog::debug("dict size:{} pos size: {}", dict.size(), frags_pos.size());
+    spdlog::debug("chr: {} memory(MB): {}", _contig_names[chr_id], physical_memory_used_by_process());
 
     // Quantify NC + export
     auto& cnts = _total_nc_cnts[chr_id];
@@ -929,9 +967,10 @@ int D2C::computeStatByChr(int chr_id)
             frags_pos[i] = false;
     }
 
-    set< string >                uniq_frags;
-    map< int, vector< int > >    overlap_start, overlap_end;
-    map< size_t, vector< int > > overlap_both;
+    spp::sparse_hash_set< UniqBarcode >                uniq_frags;
+    spp::sparse_hash_map< int, vector< int > >    overlap_start, overlap_end;
+    spp::sparse_hash_map< size_t, vector< int > > overlap_both;
+    size_t count = 0;
     for (size_t i = 0; i < frags_pos.size(); ++i)
     {
         if (!frags_pos[i])
@@ -941,31 +980,43 @@ int D2C::computeStatByChr(int chr_id)
         int    start   = bedpe.start;
         int    end     = bedpe.end;
         int    barcode = bedpe.barcode;
-        string key     = to_string(start) + '\t' + to_string(end) + '\t' + to_string(barcode);
-        if (uniq_frags.count(key) != 0)
+
+        UniqBarcode ub;
+        ub.start = start;
+        ub.end = end;
+        ub.barcode = barcode;
+        // string key     = to_string(start) + '\t' + to_string(end) + '\t' + to_string(barcode);
+        if (uniq_frags.count(ub) != 0)
             continue;
 
-        uniq_frags.insert(key);
+        uniq_frags.insert(ub);
 
 #ifdef UNIQ_FRAG_BOTH
         overlap_both[(( size_t )start << 32) + end].push_back(barcode);
 #else
         overlap_start[start].push_back(barcode);
         overlap_end[end].push_back(barcode);
+        count += 2;
 #endif
     }
+    spdlog::debug("uniq_frags.size: {} count: {}", uniq_frags.size(), count);
+    spdlog::debug("chr: {} before clear uniq_frags memory(MB): {}", _contig_names[chr_id], physical_memory_used_by_process());
+    uniq_frags.clear();
+    spdlog::debug("uniq_frags.size: {}", uniq_frags.size());
+    spdlog::debug("overlap_start size:{} overlap_end size:{}", overlap_start.size(), overlap_end.size());
+    spdlog::debug("chr: {} memory(MB): {}", _contig_names[chr_id], physical_memory_used_by_process());
 
     // Double to consider left and right inserts
-    map< size_t, int > bead_cnts;
+    unordered_map< size_t, int > bead_cnts;
 #ifdef UNIQ_FRAG_BOTH
-    for (auto& overlap : { overlap_both })
+    for (auto&& overlap : { overlap_both })
 #else
-    for (auto& overlap : { overlap_start, overlap_end })
+    for (auto&& overlap : { overlap_start, overlap_end })
 #endif
     {
-        for (auto& p : overlap)
+        for (auto&& p : overlap)
         {
-            auto& v = p.second;
+            auto&& v = p.second;
             if (v.size() == 1)
                 continue;
             for (size_t i = 0; i < v.size(); ++i)
@@ -982,8 +1033,12 @@ int D2C::computeStatByChr(int chr_id)
             }
         }
     }
+    spdlog::debug("bead_cnts size:{}", bead_cnts.size());
     bead_cnts.swap(_total_bead_cnts[chr_id]);
 
+    overlap_start.clear();
+    overlap_end.clear();
+    overlap_both.clear();
     // Devel
     // int line_num = 0, total_num = 0;
     // for (auto& p : bead_cnts)
@@ -995,6 +1050,7 @@ int D2C::computeStatByChr(int chr_id)
     //         total_num += count;
     //     }
     // }
+    spdlog::debug("chr: {} memory(MB): {}", _contig_names[chr_id], physical_memory_used_by_process());
 
     return 0;
 }
@@ -1033,7 +1089,7 @@ int D2C::determineBarcodeMerge()
 {
     spdlog::debug("tn5: {}", tn5);
     // Merge all barcode count
-    map< size_t, int > sum_dt;
+    spp::sparse_hash_map< size_t, int > sum_dt;
     for (auto& m : _total_bead_cnts)
     {
         for (auto& p : m)
@@ -1045,10 +1101,11 @@ int D2C::determineBarcodeMerge()
         m.clear();
     }
     _total_bead_cnts.clear();
+    spdlog::debug("sum_dt size: {}", sum_dt.size());
 
     // Filter and calculate nBC
     vector< pair< int, int > > nBC;
-    map< int, int >            count_dict;
+    spp::sparse_hash_map< int, int >            count_dict;
     for (auto& p : _total_bead_quant)
     {
         if (_hq_beads.count(p.first) == 0)
@@ -1059,6 +1116,7 @@ int D2C::determineBarcodeMerge()
 
     // Release memory of hq beads
     _hq_beads.clear();
+    spdlog::debug("count_dict size: {}", count_dict.size());
 
     // Sort by count
     std::stable_sort(nBC.begin(), nBC.end(),
@@ -1166,6 +1224,9 @@ int D2C::determineBarcodeMerge()
         cmpFunc(tbl_out, s.c_str());
     }
     cmpClose(tbl_out);
+    spdlog::debug("dump file: {}", implicated_barcode_file.string());
+    sum_dt.clear();
+    count_dict.clear();
 
     // Filter based on the min_jaccard_index
     // and prepare dict data
@@ -1338,7 +1399,7 @@ int D2C::reannotateFragByChr(int chr_id)
     _bedpes_by_chr[chr_id].clear();
     _bedpes_by_chr[chr_id].shrink_to_fit();
 
-    spdlog::debug("memory(MB): {}", physical_memory_used_by_process());
+    spdlog::debug("reannotateFragByChr memory(MB): {}", physical_memory_used_by_process());
 
     return 0;
 }
@@ -1595,7 +1656,7 @@ bool D2C::parseRunnameList()
 
         BamRecord bam_record = bam_init1();
         string    barcode("NA");
-        for (int chr_id = 0; chr_id < contigs.size(); ++chr_id)
+        for (size_t chr_id = 0; chr_id < contigs.size(); ++chr_id)
         {
             if (!sr->QueryByContig(chr_id))
                 continue;

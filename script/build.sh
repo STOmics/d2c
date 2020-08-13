@@ -12,6 +12,7 @@ yggPath="$libPath/ygg-master"
 doctestPath="$libPath/doctest-2.3.7"
 taskflowPath="$libPath/taskflow-2.5.0"
 fftwPath="$libPath/fftw-3.3.8"
+sparseppPath="$libPath/sparsepp"
 
 binPath="/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/bin"
 export PATH="$gccPath/bin:$cmakePath/bin:$binPath"
@@ -23,6 +24,7 @@ export LD_LIBRARY_PATH="/lib64:$LD_LIBRARY_PATH"
 export LIBRARY_PATH=$LD_LIBRARY_PATH
 #echo $LD_LIBRARY_PATH
 
+export C_INCLUDE_PATH="$sparseppPath/include:$C_INCLUDE_PATH"
 export C_INCLUDE_PATH="$fftwPath/include:$C_INCLUDE_PATH"
 export C_INCLUDE_PATH="$doctestPath/include:$C_INCLUDE_PATH"
 export C_INCLUDE_PATH="$libdeflatePath/include:$yggPath/include:$C_INCLUDE_PATH"
@@ -50,6 +52,7 @@ absPath(){
 #srcPath=/hwfssz1/ST_BIGDATA/USER/zhaofuxiang/git/handle_bam
 srcPath="$(cd $(dirname $(dirname $0)); pwd)"
 buildPath="$(mktemp -d -p /dev/shm $(basename $srcPath).XXXXXXXXXX)"
+
 #echo $buildPath
 buildPath="$(absPath $buildPath)"
 if [ -e "$buildPath" ]
@@ -61,7 +64,7 @@ mkdir -p $buildPath
 cd $buildPath
 #echo $buildPath
 
-installPath="$srcPath/install"
+installPath="$buildPath/install"
 mkdir -p $installPath/bin $installPath/lib
 
 timeStart=$(date +%s)
@@ -85,15 +88,6 @@ then
     exit 1
 fi
 
-
-#cp $buildPath/bin/handleBam $installPath/bin
-#cp $buildPath/bin/handleBam /hwfssz5/ST_BIGDATA/USER/zhaofuxiang/test_handleBam/handleBam
-cd $srcPath
-if [ -e "$buildPath" ]
-then
-    rm -rf $buildPath
-fi
-
 install(){
     libFile="$1"
     tlib="$installPath/lib"
@@ -112,14 +106,24 @@ install(){
 install $htslibPath/lib/libhts.so.2
 install $libdeflatePath/lib/libdeflate.so.0
 
+
+
 # Copy reference data
 if [ -e "$installPath/bin/anno" ]
 then
     echo "Reference data exists"
 else
-    cp -R anno $installPath/bin/
+    cp -R $srcPath/anno $installPath/bin/
     echo "Installing: reference data"
 fi
+
+cd $srcPath
+#cp -R $installPath .
+ln -fs $installPath .
+# if [ -e "$buildPath" ]
+# then
+#     rm -rf $buildPath
+# fi
 
 timeEnd=$(date +%s)
 secs=$(($timeEnd - $timeStart))

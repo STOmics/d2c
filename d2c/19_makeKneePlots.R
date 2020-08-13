@@ -138,8 +138,8 @@ if(file.exists(jaccardFragsFile)){
     ggplot(aes(x=rank, y=jaccard_frag)) +
     scale_y_log10(breaks = ticks_at_y, labels = as.numeric(ticks_at_y)) +
     scale_x_log10(breaks = ticks_at_x, labels = as.integer(ticks_at_x)) +
-    xlab("bap overlap score in rank-descending order") +
-    ylab("bap overlap score per barcode pair") +
+    xlab("d2c overlap score in rank-descending order") +
+    ylab("d2c overlap score per barcode pair") +
     theme(axis.text.x = element_text(angle=90)) +
     geom_point(aes(color = passKnee)) +
     scale_color_manual(values = c("black", "dodgerblue3")) +

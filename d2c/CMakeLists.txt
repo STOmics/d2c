@@ -5,8 +5,8 @@ set(SRC_PATH ${PROJECT_SOURCE_DIR})
 #set(CXX_LIB_PATH ${SRC_PATH}/cxx/lib)
 
 
-#set(CMAKE_CXX_FLAGS "-std=c++17 -O2 -DNDEBUG -W -Wall -pedantic -fopenmp -lpthread -lrt")
-set(CMAKE_CXX_FLAGS "-std=c++17 -g -ggdb -gstabs+ -pedantic -fopenmp -lpthread -lrt")
+set(CMAKE_CXX_FLAGS "-std=c++17 -O2 -DNDEBUG -W -Wall -pedantic -fopenmp -lpthread -lrt")
+#set(CMAKE_CXX_FLAGS "-std=c++17 -g -ggdb -gstabs+ -pedantic -fopenmp -lpthread -lrt")
 
 
 include_directories(../)
@@ -39,4 +39,4 @@ target_link_libraries(app
     )
 
 set_target_properties(app PROPERTIES OUTPUT_NAME "d2c")
-install(FILES 11b_knee_execute.R 10b_knee_execute.R 00_knee_CL.R 19_makeKneePlots.R DESTINATION bin)
+install(FILES 19_makeKneePlots.R DESTINATION bin)
