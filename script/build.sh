@@ -117,6 +117,9 @@ else
     echo "Installing: reference data"
 fi
 
+# Copy README
+cp -R $srcPath/README.md $installPath/bin/
+
 cd $srcPath
 #cp -R $installPath .
 ln -fs $installPath .

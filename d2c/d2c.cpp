@@ -388,7 +388,7 @@ int D2C::taskflow()
     // Step 2: determine hight quality beads
     auto determine_hq_beads = taskflow
                                   .emplace([&]() {
-                                      spdlog::debug("SplitBam memory(MB): {}", physical_memory_used_by_process());
+                                      spdlog::info("SplitBam memory(MB): {}", physical_memory_used_by_process());
                                       Timer t;
                                       D2C::determineHQBeads();
                                       spdlog::info("Determine high-quality beads time(s): {:.2f}", t.toc(1000));
@@ -421,7 +421,7 @@ int D2C::taskflow()
     // Step 4: barcode merge
     auto barcode_merge = taskflow
                              .emplace([&]() {
-                                 spdlog::debug("ComputeByChr memory(MB): {}", physical_memory_used_by_process());
+                                 spdlog::info("ComputeByChr memory(MB): {}", physical_memory_used_by_process());
                                  Timer t;
                                  D2C::determineBarcodeMerge();
                                  spdlog::info("Determine barcode merge time(s): {:.2f}", t.toc(1000));
@@ -478,7 +478,7 @@ int D2C::taskflow()
                                      bam_files.push_back(tmp_bam_file.string());
                              }
                              fs::path output_bam_file = output_path / (run_name + ".bam");
-                             spdlog::debug("be merged file size: {}", bam_files.size());
+                             spdlog::info("Be merged file size: {}", bam_files.size());
                              // for (auto& name : bam_files)
                              //     spdlog::debug("merge bam: {}", name);
                              try
@@ -506,7 +506,7 @@ int D2C::taskflow()
     auto merge_frags =
         taskflow
             .emplace([&]() {
-                spdlog::debug("Reannotate frags memory(MB): {}", physical_memory_used_by_process());
+                spdlog::info("Reannotate frags memory(MB): {}", physical_memory_used_by_process());
                 spdlog::debug("Merge frags");
                 Timer t;
                 for (auto& chr_id : used_chrs)
