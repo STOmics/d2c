@@ -894,7 +894,7 @@ int D2C::determineHQBeads()
                   calculated_barcode_frags, min_barcode_frags);
     if (calculated_barcode_frags > min_barcode_frags)
     {
-        spdlog::debug("Set min barcode frags from {} to {}", min_barcode_frags, calculated_barcode_frags);
+        spdlog::info("Set min barcode frags from {} to {}", min_barcode_frags, calculated_barcode_frags);
         min_barcode_frags = calculated_barcode_frags;
     }
 
@@ -999,12 +999,12 @@ int D2C::computeStatByChr(int chr_id)
         count += 2;
 #endif
     }
-    spdlog::debug("uniq_frags.size: {} count: {}", uniq_frags.size(), count);
-    spdlog::debug("chr: {} before clear uniq_frags memory(MB): {}", _contig_names[chr_id], physical_memory_used_by_process());
+    // spdlog::debug("uniq_frags.size: {} count: {}", uniq_frags.size(), count);
+    // spdlog::debug("chr: {} before clear uniq_frags memory(MB): {}", _contig_names[chr_id], physical_memory_used_by_process());
     uniq_frags.clear();
-    spdlog::debug("uniq_frags.size: {}", uniq_frags.size());
-    spdlog::debug("overlap_start size:{} overlap_end size:{}", overlap_start.size(), overlap_end.size());
-    spdlog::debug("chr: {} memory(MB): {}", _contig_names[chr_id], physical_memory_used_by_process());
+    // spdlog::debug("uniq_frags.size: {}", uniq_frags.size());
+    // spdlog::debug("overlap_start size:{} overlap_end size:{}", overlap_start.size(), overlap_end.size());
+    // spdlog::debug("chr: {} memory(MB): {}", _contig_names[chr_id], physical_memory_used_by_process());
 
     // Double to consider left and right inserts
     unordered_map< size_t, int > bead_cnts;
@@ -1087,7 +1087,19 @@ bool D2C::checkTn5(size_t l)
 
 int D2C::determineBarcodeMerge()
 {
-    spdlog::debug("tn5: {}", tn5);
+    spdlog::debug("tn5: {} regularize_threshold: {}", tn5, regularize_threshold);
+    // Devel
+    // fs::path temp_out = output_path / "temp.txt";
+    // ofstream temp_ofs(temp_out.string(), std::ofstream::out);
+    // for (auto& m : _total_bead_cnts)
+    // {
+    //     for (auto& p : m)
+    //     {
+    //         temp_ofs << p.second<< "\n";
+    //     }
+    // }
+    // temp_ofs.close();
+    spdlog::debug("_total_bead_cnts size: {}", _total_bead_cnts.size());
     // Merge all barcode count
     spp::sparse_hash_map< size_t, int > sum_dt;
     for (auto& m : _total_bead_cnts)
@@ -1098,6 +1110,7 @@ int D2C::determineBarcodeMerge()
             if (p.second >= regularize_threshold && checkTn5(p.first))
                 sum_dt[p.first] += p.second;
         }
+        //spdlog::debug("m size: {} sum_dt size: {}", m.size(), sum_dt.size());
         m.clear();
     }
     _total_bead_cnts.clear();
@@ -1192,7 +1205,7 @@ int D2C::determineBarcodeMerge()
                   calculated_jaccard_index, min_jaccard_index);
     if (calculated_jaccard_index > min_jaccard_index)
     {
-        spdlog::debug("Set min jaccard index from {} to {}", min_jaccard_index, calculated_jaccard_index);
+        spdlog::info("Set min jaccard index from {} to {}", min_jaccard_index, calculated_jaccard_index);
         min_jaccard_index = calculated_jaccard_index;
     }
 

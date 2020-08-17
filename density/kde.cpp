@@ -292,7 +292,7 @@ vector<int> KDE::find_local_minima()
     }
 	
 	vector<int> minima;
-    if (minima_temp.size() > 3)
+    if (minima_temp.size() > 2)
     {
         for (int i = 0; i < minima_temp.size() / 2; i++)
         {
