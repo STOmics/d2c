@@ -119,6 +119,7 @@ fi
 
 # Copy README
 cp -R $srcPath/README.md $installPath/bin/
+cp -R $srcPath/CHANGELOG.md $installPath/bin/
 
 cd $srcPath
 cp -R $installPath $srcPath

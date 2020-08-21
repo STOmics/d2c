@@ -35,7 +35,7 @@ Options:
   -h,--help                             Print this help message and exit
   -i TEXT:FILE REQUIRED                 Input bam filename
   -o TEXT REQUIRED                      Output result path
-  -b TEXT:FILE REQUIRED                 Barcode list file
+  -b TEXT:FILE                          Barcode list file
   --bt TEXT                             Barcode tag in bam file, default 'XB'
   --mapq INT                            Filter thrshold of mapping quality, default 30
   -c INT                                CPU core number, default detect
@@ -43,6 +43,7 @@ Options:
   --tn5                                 Process data knowing that the barcodes were generated with a barcoded Tn5
   --bf FLOAT                            Minimum number of fragments to be thresholded for doublet merging
   --ji FLOAT                            Minimum jaccard index for collapsing bead barcodes to cell barcodes
+  --log TEXT                            Set logging path, default is './logs'
   -r TEXT                               Specify supported reference genome, default hg19
   --mc TEXT                             Name of the mitochondrial chromosome
   --bg TEXT:FILE                        Bedtools genome file
@@ -53,7 +54,7 @@ Options:
   --sat                                 Output sequencing saturation file, default False
   --br TEXT:FILE                        Barcode runname list file, default detect
 
-D2C version: 1.0.0
+D2C version: 1.1.0
 ```
 
 三个必需参数:
@@ -155,6 +156,7 @@ D2C version: 1.0.0
 
 * 支持 *-c* 参数指定CPU核数,程序运行更加灵活
 * 使用python画图替代现有的R脚本,图表形式变更
+* 增加测序饱和度的图片输出
 
 
 性能:

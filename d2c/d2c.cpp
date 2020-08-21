@@ -26,6 +26,7 @@
 #include <tuple>
 
 #include <htslib/tbx.h>
+#include <htslib/bgzf.h>
 
 // Control the standart of uniq fragments, BOTH mean start and end are both equal
 //#define UNIQ_FRAG_BOTH
@@ -524,21 +525,22 @@ int D2C::taskflow()
                         continue;
                     _final_frags.insert(_final_frags.end(), _dup_frags[chr_id].begin(), _dup_frags[chr_id].end());
                     _dup_frags[chr_id].clear();
-                    // _dup_frags[chr_id].shrink_to_fit();
+                    _dup_frags[chr_id].shrink_to_fit();
                 }
                 spdlog::debug("Final frags size: {}", _final_frags.size());
+
                 fs::path out_frag_file = output_path / (run_name + FRAGMENT_FILE);
                 spdlog::debug("Dump frags to: {}", out_frag_file.string());
-                cmpFile out_frag;
-                out_frag = cmpOpen(out_frag_file.c_str());
+                BGZF* out_frag;
+                out_frag = bgzf_open(out_frag_file.c_str(), "w");
                 for (auto& l : _final_frags)
                 {
                     // Standardized format output, insert one column data
                     string s = l + "\t1\n";
                     // spdlog::debug(s);
-                    cmpFunc(out_frag, s.c_str());
+                    bgzf_write(out_frag, s.c_str(), s.size());
                 }
-                cmpClose(out_frag);
+                bgzf_close(out_frag);
                 spdlog::info("Merge frags time(s): {:.2f}", t.toc(1000));
 
                 if (tbx_index_build(out_frag_file.c_str(), 0, &tbx_conf_bed))
