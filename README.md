@@ -60,10 +60,10 @@ D2C version: 1.0.0
 
 * -i 输入bam文件,如无index,程序自动创建index文件
 * -o 输出目录
-* -b barcode列表文件,即存储了1536种barcode类型的文本文件
   
 可选参数:
 
+* -b barcode列表文件,即存储了1536种barcode类型的文本文件
 * --bt bam文件中barcode的标签,默认 *XB*
 * --mapq 质量过滤阈值,默认 30
 * -c 设置CPU核数,暂不支持该参数
@@ -78,6 +78,7 @@ D2C version: 1.0.0
 * --bg --bl --ts 这三个参数用于非模式生物
 * --sat 计算测序饱和度
 * --br 存储barcode后缀的run name的列表文件(如果未指定,程序需花费一定时间遍历bam文件来查找所有run name)
+* --logs 设置日志存储路径,默认为当前路径下的 *logs*
 
 ### 输出
 

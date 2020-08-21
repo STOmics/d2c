@@ -34,6 +34,9 @@ constexpr auto APP_VERSION = "1.0.0";
 int main(int argc, char** argv)
 {
     Timer timer;
+    fs::path exe_path      = argv[0];
+    exe_path               = fs::absolute(exe_path).parent_path();
+
     // Parse the command line parameters.
     CLI::App app{ string(APP_NAME) + ": Drop to Cell." };
     app.footer(string(APP_NAME) + " version: " + APP_VERSION);
@@ -43,10 +46,10 @@ int main(int argc, char** argv)
     string input_bam, output_path;
     app.add_option("-i", input_bam, "Input bam filename")->check(CLI::ExistingFile)->required();
     app.add_option("-o", output_path, "Output result path")->required();
-    string barcode_list;
-    app.add_option("-b", barcode_list, "Barcode list file")->check(CLI::ExistingFile)->required();
 
     // Optional parameters
+    string barcode_list = (exe_path/"barcode.list").string();
+    app.add_option("-b", barcode_list, "Barcode list file")->check(CLI::ExistingFile);
     string barcode_tag = "XB";
     app.add_option("--bt", barcode_tag, "Barcode tag in bam file, default 'XB'");
     int mapq = 30;
@@ -62,6 +65,10 @@ int main(int argc, char** argv)
     app.add_option("--bf", min_barcode_frags, "Minimum number of fragments to be thresholded for doublet merging");
     double min_jaccard_index = 0.0;
     app.add_option("--ji", min_jaccard_index, "Minimum jaccard index for collapsing bead barcodes to cell barcodes");
+
+    string log_path = "logs";
+    app.add_option("--log", log_path, "Set logging path, default is './logs'");
+
 
     // Model organism
     string ref = "hg19";
@@ -97,8 +104,6 @@ int main(int argc, char** argv)
         cores = std::thread::hardware_concurrency();
     if (run_name.empty())
         run_name = fs::path(input_bam).stem().string();
-    fs::path exe_path      = argv[0];
-    exe_path               = fs::absolute(exe_path).parent_path();
     fs::path      ref_path = exe_path / "anno";
     set< string > supported_genomes;
     for (auto& p : fs::directory_iterator(ref_path / "bedtools"))
@@ -184,7 +189,8 @@ int main(int argc, char** argv)
     try
     {
         // auto file_logger = spdlog::basic_logger_mt("main", "logs/" + ostr.str());
-        auto file_sink      = std::make_shared< spdlog::sinks::basic_file_sink_mt >(exe_path / "logs" / ostr.str());
+        fs::path fs_log_path(log_path);
+        auto file_sink      = std::make_shared< spdlog::sinks::basic_file_sink_mt >(fs_log_path / ostr.str());
         auto main_logger    = std::make_shared< spdlog::logger >("main", file_sink);
         auto process_logger = std::make_shared< spdlog::logger >("process", file_sink);
         spdlog::register_logger(main_logger);

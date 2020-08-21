@@ -121,12 +121,12 @@ fi
 cp -R $srcPath/README.md $installPath/bin/
 
 cd $srcPath
-#cp -R $installPath .
-ln -fs $installPath .
-# if [ -e "$buildPath" ]
-# then
-#     rm -rf $buildPath
-# fi
+cp -R $installPath $srcPath
+#ln -fs $installPath .
+if [ -e "$buildPath" ]
+then
+    rm -rf $buildPath
+fi
 
 timeEnd=$(date +%s)
 secs=$(($timeEnd - $timeStart))

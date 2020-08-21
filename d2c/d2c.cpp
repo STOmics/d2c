@@ -25,6 +25,8 @@
 #include <thread>
 #include <tuple>
 
+#include <htslib/tbx.h>
+
 // Control the standart of uniq fragments, BOTH mean start and end are both equal
 //#define UNIQ_FRAG_BOTH
 
@@ -485,7 +487,13 @@ int D2C::taskflow()
                              {
                                  int cmd_rtn = bam_cat(bam_files, nullptr, output_bam_file.c_str(), nullptr, 0);
                                  if (cmd_rtn == 0)
-                                     spdlog::info("Merge bam file success");
+                                 {
+                                    spdlog::info("Merge bam file success");
+                                    // Build index file
+                                    Timer index_timer;
+                                    auto samReader = SamReader::FromFile(output_bam_file);
+                                    spdlog::info("Build bam index time(s): {:.2f}", index_timer.toc(1000));
+                                 }
                                  else
                                      spdlog::error("Merge bam file fail, rtn:{}", cmd_rtn);
                              }
@@ -497,7 +505,7 @@ int D2C::taskflow()
                              {
                                  spdlog::error("Error in merge bam");
                              }
-                             spdlog::info("Merge bam time(s): {:.2f}", t.toc(1000));
+                             spdlog::info("Merge bam time(s): {:.2f}", t.toc(1000));                            
                          })
                          .name("Merge bam");
     merge_bam.succeed(end_annobam);
@@ -516,8 +524,9 @@ int D2C::taskflow()
                         continue;
                     _final_frags.insert(_final_frags.end(), _dup_frags[chr_id].begin(), _dup_frags[chr_id].end());
                     _dup_frags[chr_id].clear();
-                    _dup_frags[chr_id].shrink_to_fit();
+                    // _dup_frags[chr_id].shrink_to_fit();
                 }
+                spdlog::debug("Final frags size: {}", _final_frags.size());
                 fs::path out_frag_file = output_path / (run_name + FRAGMENT_FILE);
                 spdlog::debug("Dump frags to: {}", out_frag_file.string());
                 cmpFile out_frag;
@@ -526,10 +535,16 @@ int D2C::taskflow()
                 {
                     // Standardized format output, insert one column data
                     string s = l + "\t1\n";
+                    // spdlog::debug(s);
                     cmpFunc(out_frag, s.c_str());
                 }
                 cmpClose(out_frag);
                 spdlog::info("Merge frags time(s): {:.2f}", t.toc(1000));
+
+                if (tbx_index_build(out_frag_file.c_str(), 0, &tbx_conf_bed))
+                    spdlog::warn("Failed build frags index");
+                else
+                    spdlog::info("Build frags index time(s): {:.2f}", t.toc(1000));
             })
             .name("Merge fragments");
     merge_frags.succeed(end_reanno);
@@ -691,13 +706,23 @@ int D2C::splitBamByChr(int chr_id)
     spdlog::debug("chr: {} frags size: {}", _contig_names[chr_id], bedpes.size());
     spdlog::debug("chr: {} memory(MB): {}", _contig_names[chr_id], physical_memory_used_by_process());
 
+
     // Devel
-    // if (chr_str == "chrMT")
+    // if (chr_str == "chrX")
     // {
-    //     ofstream ofs(output_path/"chrMT.bedpe.annotated.tsv", std::ofstream::out);
+    //     // ofstream ofs(output_path/"chrX.bedpe.annotated.tsv", std::ofstream::out);
+    //     fs::path temp_path = output_path/"chrX.bedpe.annotated.tsv";
+    //     FILE *temp;
+    //     temp = fopen(temp_path.c_str(), "w");
     //     for (auto& p : bedpes)
-    //         ofs<<p.start<<'\t'<<p.end<<'\t'<<p.qname<<'\t'<<p.barcode<<endl;
-    //     ofs.close();
+    //     {
+    //         // ofs<<p.start<<'\t'<<p.end<<'\t'<<int2Barcode(p.barcode)<<int2Runname(p.barcode)<<endl;
+    //         string s = to_string(p.start)+"\t"+to_string(p.end)+"\t"+int2Barcode(p.barcode)+int2Runname(p.barcode)+"\n";
+    //         fwrite(s.c_str(), 1, s.size(), temp);
+    //     }
+            
+    //     //ofs.close();
+    //     fclose(temp);
     // }
 
     // Load blacklist file and construct interval tree
@@ -1025,7 +1050,7 @@ int D2C::computeStatByChr(int chr_id)
                 {
                     if (v[i] == v[j])
                         continue;
-                    if (v[i] > v[j])
+                    if (int2Barcode(v[i]) > int2Barcode(v[j]))
                         ++bead_cnts[(( size_t )v[i] << 32) + v[j]];
                     else
                         ++bead_cnts[(( size_t )v[j] << 32) + v[i]];
@@ -1063,8 +1088,8 @@ inline string substrRight(string s, int n = 6)
 // Example: ATCG,TCGA
 bool D2C::checkTn5(string s)
 {
-    if (!tn5)
-        return true;
+    // if (!tn5)
+    //     return true;
 
     size_t pos = s.find(',');
     if (pos == std::string::npos)
@@ -1077,8 +1102,8 @@ bool D2C::checkTn5(string s)
 // Example: int32int32
 bool D2C::checkTn5(size_t l)
 {
-    if (!tn5)
-        return true;
+    // if (!tn5)
+    //     return true;
 
     string s1 = int2Barcode(int(l >> 32));
     string s2 = int2Barcode(int(l & 0xFFFF));
@@ -1102,16 +1127,33 @@ int D2C::determineBarcodeMerge()
     spdlog::debug("_total_bead_cnts size: {}", _total_bead_cnts.size());
     // Merge all barcode count
     spp::sparse_hash_map< size_t, int > sum_dt;
-    for (auto& m : _total_bead_cnts)
+    if (tn5)
     {
-        for (auto& p : m)
+        for (auto& m : _total_bead_cnts)
         {
-            // Only consider merging when Tn5 is the same
-            if (p.second >= regularize_threshold && checkTn5(p.first))
-                sum_dt[p.first] += p.second;
+            for (auto& p : m)
+            {
+                // Only consider merging when Tn5 is the same
+                if (p.second >= regularize_threshold && checkTn5(p.first))
+                    sum_dt[p.first] += p.second;
+            }
+            //spdlog::debug("m size: {} sum_dt size: {}", m.size(), sum_dt.size());
+            m.clear();
         }
-        //spdlog::debug("m size: {} sum_dt size: {}", m.size(), sum_dt.size());
-        m.clear();
+    }
+    else
+    {
+        for (auto& m : _total_bead_cnts)
+        {
+            for (auto& p : m)
+            {
+                // Only consider merging when Tn5 is the same
+                if (p.second >= regularize_threshold)
+                    sum_dt[p.first] += p.second;
+            }
+            //spdlog::debug("m size: {} sum_dt size: {}", m.size(), sum_dt.size());
+            m.clear();
+        }
     }
     _total_bead_cnts.clear();
     spdlog::debug("sum_dt size: {}", sum_dt.size());
@@ -1687,6 +1729,9 @@ bool D2C::parseRunnameList()
                     _runname2int[name] = pos++;
                 }
             }
+            // Just check one chromosome, it is enough
+            if (_runnames.size() > 1)
+                break;
         }
         bam_destroy1(bam_record);
     }
