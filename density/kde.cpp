@@ -21,10 +21,10 @@
 
 void KDE::initialization()
 {
-    Count   = 0;
-    bw      = 0.1;
-    n_user  = 10000;
-    n       = pow(2, ceil(log2(n_user)));
+    Count  = 0;
+    bw     = 0.1;
+    n_user = 10000;
+    n      = pow(2, ceil(log2(n_user)));
     kords.resize(n);
     xords.resize(n);
     density.resize(n_user);
@@ -57,7 +57,7 @@ void KDE::fft()
     fftw_complex* in;
     fftw_complex *temp_out, *y_fft, *kords_fft;
     fftw_plan     p;
-    //in        = ( fftw_complex* )fftw_malloc(sizeof(fftw_complex) * Num);
+    // in        = ( fftw_complex* )fftw_malloc(sizeof(fftw_complex) * Num);
     y_fft     = ( fftw_complex* )fftw_malloc(sizeof(fftw_complex) * Num);
     kords_fft = ( fftw_complex* )fftw_malloc(sizeof(fftw_complex) * Num);
     temp_out  = ( fftw_complex* )fftw_malloc(sizeof(fftw_complex) * Num);
@@ -132,11 +132,11 @@ void KDE::writeData()
 
 pair< double, double > KDE::get_density_threshold(string type)
 {
-    auto   minima = find_local_minima();
+    auto minima = find_local_minima();
 
     int    x, local_min = 0;
     double abs_difference = 0.5;
-    for (int i = minima.size()-1; i >= 0; i--)
+    for (int i = minima.size() - 1; i >= 0; i--)
     {
         x = minima[i];
         if ((x >= 0.2 * n_user) & ((max - vec_x[x]) > abs_difference || (vec_x[x] < max / 2)))
@@ -146,11 +146,11 @@ pair< double, double > KDE::get_density_threshold(string type)
         }
     }
 
-	double threshold      = 0;
+    double threshold = 0;
     if (local_min != 0)
-	{
+    {
         threshold = pow(10, vec_x[local_min]);
-	}
+    }
     else
     {
         threshold = 0;
@@ -179,10 +179,10 @@ void KDE::filter()
         {
             data_array.pop_back();
         }
-		else
-		{
-			break;
-		}
+        else
+        {
+            break;
+        }
     }
     min = data_array.back();
     max = data_array.front();
@@ -200,7 +200,7 @@ int compare(const void * a, const void * b) {
 double KDE::get_min_mode()
 {
     std::sort(data_array.begin(), data_array.end(), std::greater< double >());
-    //cout << N << ' ' << data_array.size() << endl;
+    // cout << N << ' ' << data_array.size() << endl;
     int    count    = 1;
     int    maxcount = 1;
     double min_mode = data_array.back();
@@ -276,33 +276,33 @@ double KDE::pdf_linear_interpol(double v)
     return d;
 }
 
-vector<int> KDE::find_local_minima()
+vector< int > KDE::find_local_minima()
 {
-	vector<int> minima_temp;
-    
-    int  flag = 0;
+    vector< int > minima_temp;
+
+    int flag = 0;
     if (density[1] - density[0] > 0)
         flag = 1;
     for (int i = 1; i < n_user - 1; i++)
     {
         if ((density[i] - density[i - 1]) * (density[i + 1] - density[i]) < 0)
         {
-			minima_temp.push_back(i);
+            minima_temp.push_back(i);
         }
     }
-	
-	vector<int> minima;
+
+    vector< int > minima;
     if (minima_temp.size() > 2)
     {
         for (int i = 0; i < minima_temp.size() / 2; i++)
         {
-			minima.push_back(minima_temp[2 * i + flag]);
+            minima.push_back(minima_temp[2 * i + flag]);
         }
     }
-	else
-	{
-		minima = minima_temp;
-	}
+    else
+    {
+        minima = minima_temp;
+    }
 
     return minima;
 }
@@ -331,7 +331,7 @@ pair< double, double > KDE::run(vector< double >& input, string type)
         i++;
     }
 
-	auto res = get_density_threshold(type);
+    auto res = get_density_threshold(type);
 
     return res;
 }

@@ -39,4 +39,4 @@ target_link_libraries(app
     )
 
 set_target_properties(app PROPERTIES OUTPUT_NAME "d2c")
-install(FILES 19_makeKneePlots.R barcode.list DESTINATION bin)
+install(FILES plot.py barcode.list DESTINATION bin)

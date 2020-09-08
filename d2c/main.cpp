@@ -33,9 +33,9 @@ constexpr auto APP_VERSION = "1.1.0";
 
 int main(int argc, char** argv)
 {
-    Timer timer;
-    fs::path exe_path      = argv[0];
-    exe_path               = fs::absolute(exe_path).parent_path();
+    Timer    timer;
+    fs::path exe_path = argv[0];
+    exe_path          = fs::absolute(exe_path).parent_path();
 
     // Parse the command line parameters.
     CLI::App app{ string(APP_NAME) + ": Drop to Cell." };
@@ -48,7 +48,7 @@ int main(int argc, char** argv)
     app.add_option("-o", output_path, "Output result path")->required();
 
     // Optional parameters
-    string barcode_list = (exe_path/"barcode.list").string();
+    string barcode_list = (exe_path / "barcode.list").string();
     app.add_option("-b", barcode_list, "Barcode list file")->check(CLI::ExistingFile);
     string barcode_tag = "XB";
     app.add_option("--bt", barcode_tag, "Barcode tag in bam file, default 'XB'");
@@ -68,7 +68,6 @@ int main(int argc, char** argv)
 
     string log_path = "logs";
     app.add_option("--log", log_path, "Set logging path, default is './logs'");
-
 
     // Model organism
     string ref = "hg19";
@@ -190,9 +189,9 @@ int main(int argc, char** argv)
     {
         // auto file_logger = spdlog::basic_logger_mt("main", "logs/" + ostr.str());
         fs::path fs_log_path(log_path);
-        auto file_sink      = std::make_shared< spdlog::sinks::basic_file_sink_mt >(fs_log_path / ostr.str());
-        auto main_logger    = std::make_shared< spdlog::logger >("main", file_sink);
-        auto process_logger = std::make_shared< spdlog::logger >("process", file_sink);
+        auto     file_sink      = std::make_shared< spdlog::sinks::basic_file_sink_mt >(fs_log_path / ostr.str());
+        auto     main_logger    = std::make_shared< spdlog::logger >("main", file_sink);
+        auto     process_logger = std::make_shared< spdlog::logger >("process", file_sink);
         spdlog::register_logger(main_logger);
         spdlog::register_logger(process_logger);
         spdlog::set_default_logger(process_logger);

@@ -99,7 +99,7 @@ private:
     std::mutex                                _merge_chr_mutex;
     unordered_set< int >                      _hq_beads;
     vector< map< int, int > >                 _total_nc_cnts;
-    vector< unordered_map< size_t, int > >              _total_bead_cnts;
+    vector< unordered_map< size_t, int > >    _total_bead_cnts;
     unordered_map< int, string >              _drop_barcodes;
     vector< string >                          _contig_names;
     vector< vector< string > >                _dup_frags;

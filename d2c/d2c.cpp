@@ -15,9 +15,9 @@
 #include "timer.h"
 #include "utility.h"
 
+#include <sparsepp/spp.h>
 #include <spdlog/spdlog.h>
 #include <taskflow/taskflow.hpp>
-#include <sparsepp/spp.h>
 
 #include <algorithm>
 #include <exception>
@@ -25,8 +25,8 @@
 #include <thread>
 #include <tuple>
 
-#include <htslib/tbx.h>
 #include <htslib/bgzf.h>
+#include <htslib/tbx.h>
 
 // Control the standart of uniq fragments, BOTH mean start and end are both equal
 //#define UNIQ_FRAG_BOTH
@@ -46,7 +46,7 @@ constexpr int BMASK = 0xFFF;     // mask for get single bacode value
 constexpr int RMASK = 0xFF;      // mask for get runname value
 
 // Filenames
-constexpr auto PLOT_SCRIPT              = "19_makeKneePlots.R";
+constexpr auto PLOT_SCRIPT              = "plot.py";
 constexpr auto BEAD_THRE_SCRIPT         = "10b_knee_execute.R";
 constexpr auto JACCARD_THRE_SCRIPT      = "11b_knee_execute.R";
 constexpr auto PARAM_FILE               = ".d2cParam.csv";
@@ -489,11 +489,13 @@ int D2C::taskflow()
                                  int cmd_rtn = bam_cat(bam_files, nullptr, output_bam_file.c_str(), nullptr, 0);
                                  if (cmd_rtn == 0)
                                  {
-                                    spdlog::info("Merge bam file success");
-                                    // Build index file
-                                    Timer index_timer;
-                                    auto samReader = SamReader::FromFile(output_bam_file);
-                                    spdlog::info("Build bam index time(s): {:.2f}", index_timer.toc(1000));
+                                     spdlog::info("Merge bam file success");
+                                     // Build index file
+                                     Timer index_timer;
+                                     if (fs::exists(output_bam_file / ".bai"))
+                                         fs::remove(output_bam_file / ".bai");
+                                     auto samReader = SamReader::FromFile(output_bam_file);
+                                     spdlog::info("Build bam index time(s): {:.2f}", index_timer.toc(1000));
                                  }
                                  else
                                      spdlog::error("Merge bam file fail, rtn:{}", cmd_rtn);
@@ -506,7 +508,7 @@ int D2C::taskflow()
                              {
                                  spdlog::error("Error in merge bam");
                              }
-                             spdlog::info("Merge bam time(s): {:.2f}", t.toc(1000));                            
+                             spdlog::info("Merge bam time(s): {:.2f}", t.toc(1000));
                          })
                          .name("Merge bam");
     merge_bam.succeed(end_annobam);
@@ -643,8 +645,7 @@ int D2C::taskflow()
     return 0;
 }
 
-
-bool operator< (const UniqBarcode& lhs, const UniqBarcode& rhs)
+bool operator<(const UniqBarcode& lhs, const UniqBarcode& rhs)
 {
     if (lhs.start < rhs.start)
         return true;
@@ -708,7 +709,6 @@ int D2C::splitBamByChr(int chr_id)
     spdlog::debug("chr: {} frags size: {}", _contig_names[chr_id], bedpes.size());
     spdlog::debug("chr: {} memory(MB): {}", _contig_names[chr_id], physical_memory_used_by_process());
 
-
     // Devel
     // if (chr_str == "chrX")
     // {
@@ -719,10 +719,11 @@ int D2C::splitBamByChr(int chr_id)
     //     for (auto& p : bedpes)
     //     {
     //         // ofs<<p.start<<'\t'<<p.end<<'\t'<<int2Barcode(p.barcode)<<int2Runname(p.barcode)<<endl;
-    //         string s = to_string(p.start)+"\t"+to_string(p.end)+"\t"+int2Barcode(p.barcode)+int2Runname(p.barcode)+"\n";
+    //         string s =
+    //         to_string(p.start)+"\t"+to_string(p.end)+"\t"+int2Barcode(p.barcode)+int2Runname(p.barcode)+"\n";
     //         fwrite(s.c_str(), 1, s.size(), temp);
     //     }
-            
+
     //     //ofs.close();
     //     fclose(temp);
     // }
@@ -756,8 +757,8 @@ int D2C::splitBamByChr(int chr_id)
     }
 
     // set< UniqBarcode > pcr_dup;
-    spp::sparse_hash_set<UniqBarcode> pcr_dup;
-    //unordered_set<string> pcr_dup;
+    spp::sparse_hash_set< UniqBarcode > pcr_dup;
+    // unordered_set<string> pcr_dup;
     // Quantify the number of unique fragments per barcode
     unordered_map< int, int > bead_quant;
     // vector<string> bead_order;
@@ -773,11 +774,11 @@ int D2C::splitBamByChr(int chr_id)
         if (res.begin() != res.end())
             continue;
 
-        int    barcode = b.barcode;
+        int barcode = b.barcode;
         // string key     = to_string(start) + '\t' + to_string(end) + '\t' + to_string(barcode);
         UniqBarcode ub;
-        ub.start = start;
-        ub.end = end;
+        ub.start   = start;
+        ub.end     = end;
         ub.barcode = barcode;
         if (pcr_dup.count(ub) == 0)
         {
@@ -787,9 +788,9 @@ int D2C::splitBamByChr(int chr_id)
     }
     spdlog::debug("prc dup size: {}", pcr_dup.size());
     pcr_dup.clear();
-    
-    //unordered_set<string>().swap(pcr_dup);
-   
+
+    // unordered_set<string>().swap(pcr_dup);
+
     // Devel
     // if (chr_str == "chrMT")
     // {
@@ -994,23 +995,23 @@ int D2C::computeStatByChr(int chr_id)
             frags_pos[i] = false;
     }
 
-    spp::sparse_hash_set< UniqBarcode >                uniq_frags;
+    spp::sparse_hash_set< UniqBarcode >           uniq_frags;
     spp::sparse_hash_map< int, vector< int > >    overlap_start, overlap_end;
     spp::sparse_hash_map< size_t, vector< int > > overlap_both;
-    size_t count = 0;
+    size_t                                        count = 0;
     for (size_t i = 0; i < frags_pos.size(); ++i)
     {
         if (!frags_pos[i])
             continue;
 
-        auto&  bedpe   = frags_data[i];
-        int    start   = bedpe.start;
-        int    end     = bedpe.end;
-        int    barcode = bedpe.barcode;
+        auto& bedpe   = frags_data[i];
+        int   start   = bedpe.start;
+        int   end     = bedpe.end;
+        int   barcode = bedpe.barcode;
 
         UniqBarcode ub;
-        ub.start = start;
-        ub.end = end;
+        ub.start   = start;
+        ub.end     = end;
         ub.barcode = barcode;
         // string key     = to_string(start) + '\t' + to_string(end) + '\t' + to_string(barcode);
         if (uniq_frags.count(ub) != 0)
@@ -1027,7 +1028,8 @@ int D2C::computeStatByChr(int chr_id)
 #endif
     }
     // spdlog::debug("uniq_frags.size: {} count: {}", uniq_frags.size(), count);
-    // spdlog::debug("chr: {} before clear uniq_frags memory(MB): {}", _contig_names[chr_id], physical_memory_used_by_process());
+    // spdlog::debug("chr: {} before clear uniq_frags memory(MB): {}", _contig_names[chr_id],
+    // physical_memory_used_by_process());
     uniq_frags.clear();
     // spdlog::debug("uniq_frags.size: {}", uniq_frags.size());
     // spdlog::debug("overlap_start size:{} overlap_end size:{}", overlap_start.size(), overlap_end.size());
@@ -1139,7 +1141,7 @@ int D2C::determineBarcodeMerge()
                 if (p.second >= regularize_threshold && checkTn5(p.first))
                     sum_dt[p.first] += p.second;
             }
-            //spdlog::debug("m size: {} sum_dt size: {}", m.size(), sum_dt.size());
+            // spdlog::debug("m size: {} sum_dt size: {}", m.size(), sum_dt.size());
             m.clear();
         }
     }
@@ -1153,7 +1155,7 @@ int D2C::determineBarcodeMerge()
                 if (p.second >= regularize_threshold)
                     sum_dt[p.first] += p.second;
             }
-            //spdlog::debug("m size: {} sum_dt size: {}", m.size(), sum_dt.size());
+            // spdlog::debug("m size: {} sum_dt size: {}", m.size(), sum_dt.size());
             m.clear();
         }
     }
@@ -1161,8 +1163,8 @@ int D2C::determineBarcodeMerge()
     spdlog::debug("sum_dt size: {}", sum_dt.size());
 
     // Filter and calculate nBC
-    vector< pair< int, int > > nBC;
-    spp::sparse_hash_map< int, int >            count_dict;
+    vector< pair< int, int > >       nBC;
+    spp::sparse_hash_map< int, int > count_dict;
     for (auto& p : _total_bead_quant)
     {
         if (_hq_beads.count(p.first) == 0)
@@ -1638,22 +1640,18 @@ int D2C::finalQC()
 
 int D2C::plot()
 {
-    fs::path script_path              = bin_path / PLOT_SCRIPT;
-    fs::path parameteter_file         = output_path / (run_name + PARAM_FILE);
-    fs::path implicated_barcodes_file = output_path / (run_name + IMPLICATED_BARCODES_FILE);
-    fs::path barcode_quant_file       = output_path / (run_name + BARCODE_QUANT_FILE);
-    string   command                  = "Rscript " + script_path.string() + " " + parameteter_file.string() + " "
-                     + barcode_quant_file.string() + " " + implicated_barcodes_file.string();
+    fs::path script_path = bin_path / PLOT_SCRIPT;
+    string command = "python -W ignore " + script_path.string() + " " + output_path.string() + " " + run_name + " 2>&1";
     vector< string > cmd_result;
     int              cmd_rtn = exec_shell(command.c_str(), cmd_result);
     for (const auto& line : cmd_result)
         if (!line.empty())
-            spdlog::error(line);
+            spdlog::info(line);
     if (cmd_rtn == 0)
-        spdlog::info("Execute Rscript success");
+        spdlog::info("Plot success");
     else
     {
-        spdlog::error("Execute Rscript fail, rtn:{}", cmd_rtn);
+        spdlog::error("Plot fail, rtn:{}", cmd_rtn);
         return -1;
     }
 

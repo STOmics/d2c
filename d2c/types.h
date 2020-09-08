@@ -35,17 +35,16 @@ struct UniqBarcode
 
 namespace std
 {
-    // Inject specialization of std::hash for UniqBarcode into namespace std
-    template<>
-    struct hash<UniqBarcode>
+// Inject specialization of std::hash for UniqBarcode into namespace std
+template <> struct hash< UniqBarcode >
+{
+    std::size_t operator()(UniqBarcode const& p) const
     {
-        std::size_t operator()(UniqBarcode const &p) const
-        {
-            std::size_t seed = 0;
-            spp::hash_combine(seed, p.start);
-            spp::hash_combine(seed, p.end);
-            spp::hash_combine(seed, p.barcode);
-            return seed;
-        }
-    };
-}
+        std::size_t seed = 0;
+        spp::hash_combine(seed, p.start);
+        spp::hash_combine(seed, p.end);
+        spp::hash_combine(seed, p.barcode);
+        return seed;
+    }
+};
+}  // namespace std

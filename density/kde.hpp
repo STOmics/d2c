@@ -18,7 +18,7 @@ class KDE
 
 public:
     KDE() : extension(4){};
-    ~KDE() {};
+    ~KDE(){};
     void                   readData();
     void                   writeData();
     void                   initialization();
@@ -27,18 +27,18 @@ public:
     pair< double, double > run(vector< double >& input, string type);
 
 private:
-    double           gauss_pdf(double x);
-    void             filter();
-    fftw_complex*    bindist();
-    vector<int>             find_local_minima();
-    double           pdf_linear_interpol(double v);
-    double           get_min_mode();
+    double        gauss_pdf(double x);
+    void          filter();
+    fftw_complex* bindist();
+    vector< int > find_local_minima();
+    double        pdf_linear_interpol(double v);
+    double        get_min_mode();
 
 private:
     double           min, max;
     vector< double > data_array;
-    vector<double>         kords, xords;
-    vector<double>         density, vec_x;
+    vector< double > kords, xords;
+    vector< double > density, vec_x;
     double           bw;
     int              Count;
     int              N, n_user, n;
