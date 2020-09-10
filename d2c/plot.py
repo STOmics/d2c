@@ -15,7 +15,6 @@ from plotly.subplots import make_subplots
 
 DEBUG = False
 
-
 def scatterBarcode(filename, threshold, out_prefix):
     
     # barcode_counts = []
@@ -27,7 +26,7 @@ def scatterBarcode(filename, threshold, out_prefix):
     # barcode_counts.sort(reverse=True)
     start_time = time.time()
     df = pd.read_csv(filename, names = ["barcode", "cnt"])
-    df.sort_values(by="cnt", ascending=False, ignore_index=True)
+    df.sort_values(by="cnt", ascending=False, ignore_index=True, inplace=True)
     
     # Plot bead barcode knee
     # df = DataFrame(barcode_counts, index=list(range(0,len(barcode_counts))), columns=["cnt"])
@@ -64,7 +63,7 @@ def scatterBarcode(filename, threshold, out_prefix):
         print(f"plot barcode knee time(s): {end_time-start_time}")
         start_time = time.time()
 
-    fig.write_image(out_prefix+".BeadBarcodeKnee.png")
+    # fig.write_image(out_prefix+".BeadBarcodeKnee.png")
     if DEBUG:
         end_time = time.time()
         print(f"dump barcode knee time(s): {end_time-start_time}")
@@ -90,7 +89,7 @@ def scatterBarcode(filename, threshold, out_prefix):
             x0=x_intercept_bead_log, x1=x_intercept_bead_log, xref="x", y0=0, y1=1, yref="paper"
         )
 
-    fig.write_image(out_prefix+".BeadBarcodeKneeDensity.png")
+    # fig.write_image(out_prefix+".BeadBarcodeKneeDensity.png")
     fig.write_html(out_prefix+".BeadBarcodeKneeDensity.html")
     if DEBUG:
         end_time = time.time()
@@ -113,7 +112,7 @@ def scatterBarcode(filename, threshold, out_prefix):
         print(f"plot curve time(s): {end_time-start_time}")
         start_time = time.time()
 
-    fig.write_image(out_prefix+".BeadBarcodeKneeCurve.png")
+    # fig.write_image(out_prefix+".BeadBarcodeKneeCurve.png")
     if DEBUG:
         end_time = time.time()
         print(f"dump curve time(s): {end_time-start_time}")
@@ -161,7 +160,7 @@ def scatterJaccard(filename, threshold, out_prefix):
         x0=x_intercept_bead, x1=x_intercept_bead, xref="x", y0=0, y1=1, yref="paper"
     )
     
-    fig.write_image(out_prefix+".JaccardOverlapKnee.png")
+    # fig.write_image(out_prefix+".JaccardOverlapKnee.png")
     fig.write_html(out_prefix+".JaccardOverlapKnee.html")
     
     
@@ -201,7 +200,7 @@ def scatterSaturation(filename, out_prefix):
    
     fig.update_layout(height=800, width=1000, showlegend=False)
 
-    fig.write_image(out_prefix+".SequencingSaturation.png")
+    # fig.write_image(out_prefix+".SequencingSaturation.png")
     fig.write_html(out_prefix+".SequencingSaturation.html")
     
     

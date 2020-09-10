@@ -13,6 +13,7 @@ doctestPath="$libPath/doctest-2.3.7"
 taskflowPath="$libPath/taskflow-2.5.0"
 fftwPath="$libPath/fftw-3.3.8"
 sparseppPath="$libPath/sparsepp"
+py="$libPath/python3.6/bin/python"
 
 binPath="/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/bin"
 export PATH="$gccPath/bin:$cmakePath/bin:$binPath"
@@ -107,7 +108,6 @@ install $htslibPath/lib/libhts.so.2
 install $libdeflatePath/lib/libdeflate.so.0
 
 
-
 # Copy reference data
 if [ -e "$installPath/bin/anno" ]
 then
@@ -120,6 +120,11 @@ fi
 # Copy README
 cp -R $srcPath/README.md $installPath/bin/
 cp -R $srcPath/CHANGELOG.md $installPath/bin/
+
+
+# compile py code
+$py -m py_compile $srcPath/d2c/plot.py
+cp $srcPath/d2c/__pycache__/plot*.pyc $installPath/bin/plot.pyc
 
 cd $srcPath
 cp -R $installPath $srcPath

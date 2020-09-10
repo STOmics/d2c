@@ -4,3 +4,6 @@ data/
 
 # compile result
 install
+
+# pyc cache file
+__pycache__

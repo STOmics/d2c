@@ -46,7 +46,7 @@ constexpr int BMASK = 0xFFF;     // mask for get single bacode value
 constexpr int RMASK = 0xFF;      // mask for get runname value
 
 // Filenames
-constexpr auto PLOT_SCRIPT              = "plot.py";
+constexpr auto PLOT_SCRIPT              = "plot.pyc";
 constexpr auto BEAD_THRE_SCRIPT         = "10b_knee_execute.R";
 constexpr auto JACCARD_THRE_SCRIPT      = "11b_knee_execute.R";
 constexpr auto PARAM_FILE               = ".d2cParam.csv";

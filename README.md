@@ -2,15 +2,13 @@
 
 Drop to Cell
 
-目前版本 **V1.0.0**
-
 ## 环境
 
 ### 运行环境
 
 * centos 7.0+
 * gcc-9.1 library
-* R library
+* python library 需要安装对应库 *numpy scipy pandas plotly kaleido*
 
 ### 脚本设置
 
@@ -18,7 +16,7 @@ Drop to Cell
 
 ```sh
 export LD_LIBRARY_PATH="/hwfssz5/ST_BIGDATA/USER/zhaofuxiang/lib/gcc-9.1.0/lib:/hwfssz5/ST_BIGDATA/USER/zhaofuxiang/lib/gcc-9.1.0/lib64:$LD_LIBRARY_PATH"
-export PATH="/hwfssz1/ST_MCHRI/STEMCELL/USER/yuanyue/bin:$PATH"
+export PATH="/hwfssz5/ST_BIGDATA/USER/zhaofuxiang/lib/python3.6/bin:$PATH"
 ```
 
 ## 输入/输出
@@ -54,7 +52,7 @@ Options:
   --sat                                 Output sequencing saturation file, default False
   --br TEXT:FILE                        Barcode runname list file, default detect
 
-D2C version: 1.1.0
+D2C version: 1.2.0
 ```
 
 三个必需参数:
@@ -101,13 +99,11 @@ D2C version: 1.1.0
 * ABC.sequenceSaturation.tsv 测序饱和度输出文件,只有给定 *--sat* 选项才生成,共四列,分别是采样比率,每个细胞的平均fragment个数,对应的测序饱和度,对应的每个cell下的唯一barcode的中值
 
 图表文件:
-* ABC.beadBarcodeKneeCurve.pdf
-* ABC.beadBarcodeKneeDensity.pdf
-* ABC.beadBarcodeKnee.pdf
-* ABC.beadBarcodeKnee.png
-* ABC.jaccardOverlapKnee.pdf
-* ABC.jaccardOverlapKnee.png
-* ABC.kneesPlotted.txt
+* ABC.BeadBarcodeKneeCurve.html
+* ABC.BeadBarcodeKneeDensity.html
+* ABC.BeadBarcodeKnee.html
+* ABC.JaccardOverlapKnee.html
+* ABC.SequencingSaturation.html 测序饱和度输出文件,只有给定 *--sat* 选项才生成
 
 日志文件:
 * bin/logs/D2C_20200813_140243.log 日志在程序目录下的logs文件夹,按程序启动时间建立文件名
@@ -150,14 +146,15 @@ D2C version: 1.1.0
     --br runname.list
 ```
 
+## 注意事项
+
+* 程序为了降低内存,对部分数据进行了编码处理,目前版本可支持的单染色体数据大小(即单条染色体在bam文件中的reads个数)需不超过2147483648,否则可能出现结果异常
+
 ## TODO
 
 功能:
 
 * 支持 *-c* 参数指定CPU核数,程序运行更加灵活
-* 使用python画图替代现有的R脚本,图表形式变更
-* 增加测序饱和度的图片输出
-
 
 性能:
 
