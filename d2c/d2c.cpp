@@ -638,7 +638,8 @@ int D2C::taskflow()
                     .name("Plot");
     plot.succeed(barcode_merge);
     plot.succeed(determine_hq_beads);
-
+    plot.succeed(sequence_saturation);
+    
     executor.run(taskflow).wait();
     // taskflow.dump(std::cout);
 

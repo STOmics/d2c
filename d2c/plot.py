@@ -198,7 +198,7 @@ def scatterSaturation(filename, out_prefix):
     fig.update_yaxes(title_text=yaxes_saturation, row=1, col=1)
     fig.update_yaxes(title_text=yaxes_median, row=1, col=2)
    
-    fig.update_layout(height=800, width=1000, showlegend=False)
+    fig.update_layout(showlegend=False)
 
     # fig.write_image(out_prefix+".SequencingSaturation.png")
     fig.write_html(out_prefix+".SequencingSaturation.html")
