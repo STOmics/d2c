@@ -492,8 +492,10 @@ int D2C::taskflow()
                                      spdlog::info("Merge bam file success");
                                      // Build index file
                                      Timer index_timer;
-                                     if (fs::exists(output_bam_file / ".bai"))
-                                         fs::remove(output_bam_file / ".bai");
+                                     auto bai_file(output_bam_file);
+                                     bai_file += ".bai";
+                                     if (fs::exists(bai_file))
+                                         fs::remove(bai_file);
                                      auto samReader = SamReader::FromFile(output_bam_file);
                                      spdlog::info("Build bam index time(s): {:.2f}", index_timer.toc(1000));
                                  }
