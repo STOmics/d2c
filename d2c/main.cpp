@@ -94,7 +94,7 @@ int main(int argc, char** argv)
     app.add_flag("--sat", saturation_on, "Output sequencing saturation file, default False");
 
     string barcode_runname_list = "";
-    app.add_option("--br", barcode_runname_list, "Barcode runname list file, default detect")->check(CLI::ExistingFile);
+    // app.add_option("--br", barcode_runname_list, "Barcode runname list file, default detect")->check(CLI::ExistingFile);
 
     CLI11_PARSE(app, argc, argv);
 

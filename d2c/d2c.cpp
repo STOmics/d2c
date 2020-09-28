@@ -540,7 +540,7 @@ int D2C::taskflow()
                     // Standardized format output, insert one column data
                     string s = l + "\t1\n";
                     // spdlog::debug(s);
-                    bgzf_write(out_frag, s.c_str(), s.size());
+                    [[maybe_unused]] auto ret = bgzf_write(out_frag, s.c_str(), s.size());
                 }
                 bgzf_close(out_frag);
                 spdlog::info("Merge frags time(s): {:.2f}", t.toc(1000));
@@ -1728,6 +1728,8 @@ bool D2C::parseRunnameList()
                         continue;
                     _runnames.push_back(name);
                     _runname2int[name] = pos++;
+                    // Users insist on not mixing multiple batches of data, so we just read one record in bam
+                    break;
                 }
             }
             // Just check one chromosome, it is enough
