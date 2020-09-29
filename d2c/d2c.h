@@ -40,8 +40,8 @@ class D2C
 public:
     D2C(string input_bam, string output_path, string barcode_tag, int mapq, int cores, string run_name, bool tn5,
         double min_barcode_frags, double min_jaccard_index, string ref, string mito_chr, string bed_genome_file,
-        string blacklist_file, string trans_file, bool species_mix, string bin_path, double barcode_threshold,
-        double jaccard_threshold, bool saturation_on, string barcode_list, string barcode_runname_list);
+        string blacklist_file, string trans_file, bool species_mix, string bin_path, int barcode_threshold,
+        int jaccard_threshold, bool saturation_on, string barcode_list, string barcode_runname_list);
     ~D2C(){};
     int run();
     int taskflow();
@@ -79,7 +79,7 @@ private:
     string   bed_genome_file, blacklist_file, trans_file;
     bool     species_mix;
     fs::path bin_path;
-    double   barcode_threshold, jaccard_threshold;
+    int   barcode_threshold, jaccard_threshold;
     bool     saturation_on;
     string   barcode_list;
     string   barcode_runname_list;

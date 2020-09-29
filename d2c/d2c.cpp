@@ -271,8 +271,8 @@ void D2C::extractBedPE(const BamRecord b1, const BamRecord b2, vector< Bedpe >& 
 
 D2C::D2C(string input_bam, string output_path, string barcode_tag, int mapq, int cores, string run_name, bool tn5,
          double min_barcode_frags, double min_jaccard_index, string ref, string mito_chr, string bed_genome_file,
-         string blacklist_file, string trans_file, bool species_mix, string bin_path, double barcode_threshold,
-         double jaccard_threshold, bool saturation_on, string barcode_list, string barcode_runname_list)
+         string blacklist_file, string trans_file, bool species_mix, string bin_path, int barcode_threshold,
+         int jaccard_threshold, bool saturation_on, string barcode_list, string barcode_runname_list)
     : input_bam(input_bam), output_path(output_path), barcode_tag(barcode_tag), mapq(mapq), cores(cores),
       run_name(run_name), tn5(tn5), min_barcode_frags(min_barcode_frags), min_jaccard_index(min_jaccard_index),
       ref(ref), mito_chr(mito_chr), bed_genome_file(bed_genome_file), blacklist_file(blacklist_file),
@@ -872,33 +872,28 @@ int D2C::determineHQBeads()
     }
     fclose(out_bead_quant);
 
-    // TODO(fxzhao): change it to cpp
-    // Call R script to calculate bead threshold
+    // Calculate bead threshold
     fs::path paras_file = output_path / (run_name + PARAM_FILE);
     ofstream ofs(paras_file.string(), std::ofstream::out);
     ofs.precision(15);
-    if (min_barcode_frags == 0.0)
+    if (barcode_threshold > 0)
     {
-        // fs::path script_path = bin_path / BEAD_THRE_SCRIPT;
-        // string command = "Rscript "+script_path.string()+" "+filename.string()+" 1 V2";
-        // vector<string> cmd_result;
-        // int cmd_rtn = exec_shell(command.c_str(), cmd_result);
-        // for (const auto& line : cmd_result)
-        //     if (!line.empty())
-        //         spdlog::error(line);
-        // if (cmd_rtn == 0)
-        //     spdlog::info("Execute Rscript success");
-        // else
-        // {
-        //     spdlog::error("Execute Rscript fail, rtn:{}", cmd_rtn);
-        //     return -1;
-        // }
-
-        // // Define the set of high-quality bead barcodes
-        // auto paras = parseBeadThreshold(filename.string()+"_kneeValue.txt");
-        // min_barcode_frags = paras.first;
-        // double call_threshold = paras.second;
-
+        // Use the top N parameter first
+        vector< double > cnts;
+        for (auto& b : _total_bead_quant)
+        {
+            cnts.push_back(b.second);
+        }
+        std::sort(cnts.begin(), cnts.end(), std::greater<double>());
+        min_barcode_frags = barcode_threshold <= static_cast<int>(cnts.size()) ? cnts[barcode_threshold-1] : cnts.back();
+    }
+    else if (min_barcode_frags != 0.0)
+    {
+        // Use the inflection parameter second
+    }
+    else
+    {
+        // Calculate the inflection point as default
         vector< double > cnts;
         for (auto& b : _total_bead_quant)
         {
@@ -908,27 +903,10 @@ int D2C::determineHQBeads()
         auto paras            = kde.run(cnts, "bead");
         min_barcode_frags     = paras.first;
         double call_threshold = paras.second;
-        // min_barcode_frags     = 500;
-        // double call_threshold = 500;
-
+    
         ofs << "bead_threshold_nosafety," << call_threshold << endl;
     }
-
-    // Add threshold for reducing data to be processed
-    vector< int > bead_nums;
-    for (auto& p : _total_bead_quant)
-        bead_nums.push_back(p.second);
-    std::nth_element(bead_nums.begin(), bead_nums.begin() + int(barcode_threshold * bead_nums.size()), bead_nums.end(),
-                     std::greater< int >());
-    int calculated_barcode_frags = *(bead_nums.begin() + int(barcode_threshold * bead_nums.size()));
-    spdlog::debug("barcode filter rate: {} calculated frags: {} min barcode frags: {}", barcode_threshold,
-                  calculated_barcode_frags, min_barcode_frags);
-    if (calculated_barcode_frags > min_barcode_frags)
-    {
-        spdlog::info("Set min barcode frags from {} to {}", min_barcode_frags, calculated_barcode_frags);
-        min_barcode_frags = calculated_barcode_frags;
-    }
-
+    
     ofs << "bead_threshold," << min_barcode_frags << endl;
     ofs.close();
 
@@ -1204,58 +1182,40 @@ int D2C::determineBarcodeMerge()
     fs::path paras_file = output_path / (run_name + PARAM_FILE);
     ofstream ofs(paras_file.string(), std::ofstream::out | std::ofstream::app);
     ofs.precision(15);
-    // Call knee if we need to
-    if (min_jaccard_index == 0.0)
+
+    if (jaccard_threshold > 0)
     {
-        // // Prepare jaccard frag data for calling R script
-        // fs::path filename = output_path / (run_name+JACCARD_TMP_FILE);
-        // ofstream jaccard_out(filename.string(), std::ofstream::out);
-        // int size = min(1000000, int(ovdf.size()));
-        // for (int i = 0; i < size; ++i)
-        //     jaccard_out<<ovdf[i].second<<"\n";
-        // jaccard_out.close();
-
-        // fs::path script_path = bin_path / JACCARD_THRE_SCRIPT;
-        // string command = "Rscript "+script_path.string()+" "+filename.string()+" 1 V1";
-        // vector<string> cmd_result;
-        // int cmd_rtn = exec_shell(command.c_str(), cmd_result);
-        // for (const auto& line : cmd_result)
-        //     if (!line.empty())
-        //         spdlog::error(line);
-        // if (cmd_rtn == 0)
-        //     spdlog::info("Execute Rscript success");
-        // else
-        // {
-        //     spdlog::info("Execute Rscript fail, rtn:{}", cmd_rtn);
-        //     return -1;
-        // }
-
-        // // Define the set of high-quality bead barcodes
-        // auto paras = parseBeadThreshold(filename.string()+"_kneeValue.txt");
-        // min_jaccard_index = paras.first;
-        // double call_threshold = paras.second;
-
+        // Use the top N parameter first
         vector< double > cnts;
         int              size = min(1000000, int(ovdf.size()));
         for (int i = 0; i < size; ++i)
         {
             cnts.push_back(ovdf[i].second);
         }
+
+        std::sort(cnts.begin(), cnts.end(), std::greater<double>());
+        min_jaccard_index = jaccard_threshold <= static_cast<int>(cnts.size()) ? cnts[jaccard_threshold-1] : cnts.back();
+    }
+    else if (min_jaccard_index != 0.0)
+    {
+        // Use the inflection parameter second
+    }
+    else
+    {
+        // Calculate the inflection point as default
+        vector< double > cnts;
+        int              size = min(1000000, int(ovdf.size()));
+        for (int i = 0; i < size; ++i)
+        {
+            cnts.push_back(ovdf[i].second);
+        }
+
         KDE  kde;
         auto paras            = kde.run(cnts, "jaccard");
         min_jaccard_index     = paras.first;
         double call_threshold = paras.second;
 
         ofs << "jaccard_threshold_nosafety," << call_threshold << endl;
-    }
-
-    float calculated_jaccard_index = ovdf[int(ovdf.size() * jaccard_threshold)].second;
-    spdlog::debug("jaccard filter rate: {} calculated jaccard: {} min barcode frags: {}", jaccard_threshold,
-                  calculated_jaccard_index, min_jaccard_index);
-    if (calculated_jaccard_index > min_jaccard_index)
-    {
-        spdlog::info("Set min jaccard index from {} to {}", min_jaccard_index, calculated_jaccard_index);
-        min_jaccard_index = calculated_jaccard_index;
     }
 
     ofs << "jaccard_threshold," << min_jaccard_index << endl;
@@ -1280,7 +1240,7 @@ int D2C::determineBarcodeMerge()
         int N_barc2 = count_dict[b2];
         s += to_string(N_barc1) + "," + to_string(N_barc2) + ",";
         s += f2str(p.second, 5) + ",";
-        s += p.second > min_jaccard_index ? "TRUE" : "FALSE";
+        s += p.second >= min_jaccard_index ? "TRUE" : "FALSE";
         s += "\n";
 
         cmpFunc(tbl_out, s.c_str());
