@@ -5,7 +5,7 @@ set(SRC_PATH ${PROJECT_SOURCE_DIR})
 #set(CXX_LIB_PATH ${SRC_PATH}/cxx/lib)
 
 
-#set(CMAKE_CXX_FLAGS "-std=c++17 -O2 -DNDEBUG -W -Wall -pedantic -fopenmp -lpthread -lrt")
+set(CMAKE_CXX_FLAGS "-std=c++17 -O2 -DNDEBUG -W -Wall -pedantic -fopenmp -lpthread -lrt")
 #set(CMAKE_CXX_FLAGS "-std=c++17 -g -ggdb -gstabs+ -pedantic -fopenmp -lpthread -lrt")
 
 
@@ -13,13 +13,16 @@ link_directories(${INSTALL_PATH}/lib)
 
 set (src
     kde.cpp
+    inflection.cpp 
+
+    barcodeRank.cpp
     )
 
 set(LIBRARY_OUTPUT_PATH ${INSTALL_PATH}/lib)
-add_library(density ${src})
+add_library(barcodeRank ${src})
 
-target_link_libraries(density
+target_link_libraries(barcodeRank
     fftw3
     )
 
-set_target_properties(density PROPERTIES OUTPUT_NAME "density")
+set_target_properties(barcodeRank PROPERTIES OUTPUT_NAME "barcodeRank")

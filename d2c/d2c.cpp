@@ -8,7 +8,7 @@
  */
 
 #include "d2c.h"
-#include "density/kde.hpp"
+#include "barcodeRank/barcodeRank.h"
 
 #include "bamCat.h"
 #include "gzIO.h"
@@ -899,12 +899,8 @@ int D2C::determineHQBeads()
         {
             cnts.push_back(b.second);
         }
-        KDE  kde;
-        auto paras            = kde.run(cnts, "bead");
-        min_barcode_frags     = paras.first;
-        double call_threshold = paras.second;
-    
-        ofs << "bead_threshold_nosafety," << call_threshold << endl;
+       
+        min_barcode_frags = barcode_rank(cnts, INFLECTION_KERNEL_TYPE::DROPLETUTILS, CURVE_DATA_TYPE::BEAD);
     }
     
     ofs << "bead_threshold," << min_barcode_frags << endl;
@@ -1210,12 +1206,7 @@ int D2C::determineBarcodeMerge()
             cnts.push_back(ovdf[i].second);
         }
 
-        KDE  kde;
-        auto paras            = kde.run(cnts, "jaccard");
-        min_jaccard_index     = paras.first;
-        double call_threshold = paras.second;
-
-        ofs << "jaccard_threshold_nosafety," << call_threshold << endl;
+        min_jaccard_index = barcode_rank(cnts, INFLECTION_KERNEL_TYPE::DROPLETUTILS, CURVE_DATA_TYPE::JACCARD);
     }
 
     ofs << "jaccard_threshold," << min_jaccard_index << endl;

@@ -32,7 +32,7 @@ add_executable(app ${src})
 add_definitions(-DCLI11_HAS_FILESYSTEM=0)
 
 target_link_libraries(app
-    density
+    barcodeRank
     z
     bz2
     hts
