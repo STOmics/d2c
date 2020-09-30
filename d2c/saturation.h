@@ -33,17 +33,18 @@ public:
     ~Saturation();
 
     // Parse raw data to vectors
-    int addData(vector< Bedpe >& frags);
+    int addData(unordered_map<string, unordered_map<string, int> >& dups_per_cell);
 
     // Calculate sequencing saturation
     int calculateSaturation(string out_file);
 
 private:
-    vector< FragData > _keys;  // Unique name, composed of barcode, gene and umi
-    int                _base2i[128];
+    vector< size_t > _keys;  // Unique name, composed of cell barcode and uniq id
     size_t             _nreads;
     char               _sep;
     vector< float >    _samples;
 
-    int _chr_num;
+    int _barcode_index;
+    int _frags_index;
+    unordered_map<string, int> _uniq_barcodes;
 };

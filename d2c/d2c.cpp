@@ -374,20 +374,6 @@ int D2C::taskflow()
     S.for_each_successor(
         [contigs, s = 0](tf::Task successor) mutable { successor.name((contigs.begin() + (s++))->first); });
 
-    // Step 1.1: sequencing saturation
-    auto sequence_saturation = taskflow
-                                   .emplace([&]() {
-                                       if (saturation_on)
-                                       {
-                                           Timer    t;
-                                           fs::path sat_out_file = output_path / (run_name + SAT_FILE);
-                                           saturation.calculateSaturation(sat_out_file.string());
-                                           spdlog::info("Sequencing saturation time(s): {:.2f}", t.toc(1000));
-                                       }
-                                   })
-                                   .name("Sequence saturation");
-    sequence_saturation.succeed(T);
-
     // Step 2: determine hight quality beads
     auto determine_hq_beads = taskflow
                                   .emplace([&]() {
@@ -448,6 +434,20 @@ int D2C::taskflow()
         [contigs, s = 0](tf::Task successor) mutable { successor.name((contigs.begin() + (s++))->first); });
     start_reanno.succeed(barcode_merge);
     start_reanno.succeed(T);
+
+    // Step 5.1: sequencing saturation
+    auto sequence_saturation = taskflow
+                                   .emplace([&]() {
+                                       if (saturation_on)
+                                       {
+                                           Timer    t;
+                                           fs::path sat_out_file = output_path / (run_name + SAT_FILE);
+                                           saturation.calculateSaturation(sat_out_file.string());
+                                           spdlog::info("Sequencing saturation time(s): {:.2f}", t.toc(1000));
+                                       }
+                                   })
+                                   .name("Sequence saturation");
+    sequence_saturation.succeed(end_reanno);
 
     // Step 6: annotate bam file by chr
     auto [start_annobam, end_annobam] = taskflow.parallel_for(used_chrs.begin(), used_chrs.end(), [&](int chr_id) {
@@ -815,11 +815,6 @@ int D2C::splitBamByChr(int chr_id)
     for (auto& b : bead_quant)
         _total_bead_quant[b.first] += b.second;
     spdlog::debug("_total_bead_quant size: {}", _total_bead_quant.size());
-    // Merge frags data for sequencing saturation
-    if (saturation_on)
-    {
-        saturation.addData(bedpes);
-    }
 
     return 0;
 }
@@ -1378,6 +1373,7 @@ int D2C::reannotateFragByChr(int chr_id)
     map< string, pair< int, int > >&       merge_ss   = _frag_stats[chr_id];
     string                                 chr        = _contig_names[chr_id];
     auto&                                  frags_data = _bedpes_by_chr[chr_id];
+    unordered_map<string, unordered_map<string, int> > dups_per_cell; // only used for saturation
     unordered_map< int, string >::iterator it;
     for (auto& bedpe : frags_data)
     {
@@ -1399,6 +1395,11 @@ int D2C::reannotateFragByChr(int chr_id)
             ++p.second;
         }
         ++p.first;
+
+        if (saturation_on)
+        {
+            dups_per_cell[cell_barcode][s]++;
+        }
     }
     qname_dup.swap(_keep_qnames[chr_id]);
 
@@ -1413,6 +1414,13 @@ int D2C::reannotateFragByChr(int chr_id)
     _bedpes_by_chr[chr_id].shrink_to_fit();
 
     spdlog::debug("reannotateFragByChr memory(MB): {}", physical_memory_used_by_process());
+
+    std::lock_guard< std::mutex > guard(_merge_chr_mutex);
+    // Merge frags data for sequencing saturation
+    if (saturation_on)
+    {
+        saturation.addData(dups_per_cell);
+    }
 
     return 0;
 }

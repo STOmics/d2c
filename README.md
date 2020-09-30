@@ -16,7 +16,7 @@ Drop to Cell
 
 ```sh
 export LD_LIBRARY_PATH="/hwfssz5/ST_BIGDATA/USER/zhaofuxiang/lib/gcc-9.1.0/lib:/hwfssz5/ST_BIGDATA/USER/zhaofuxiang/lib/gcc-9.1.0/lib64:$LD_LIBRARY_PATH"
-export PATH="/hwfssz5/ST_BIGDATA/USER/zhaofuxiang/lib/python3.6/bin:$PATH"
+export PATH="/ldfssz1/ST_BIGDATA/PMO/SOFTWARE/Python-3/bin:$PATH"
 ```
 
 ## 输入/输出
@@ -96,7 +96,7 @@ D2C version: 1.2.0
 * ABC.QCstats.csv
 * ABC.basicQC.tsv
 * ABC.d2cParam.csv
-* ABC.sequenceSaturation.tsv 测序饱和度输出文件,只有给定 *--sat* 选项才生成,共四列,分别是采样比率,每个细胞的平均fragment个数,对应的测序饱和度,对应的每个cell下的唯一barcode的中值
+* ABC.sequenceSaturation.tsv 测序饱和度输出文件,只有给定 *--sat* 选项才生成,共四列,分别是采样比率,每个cell的平均fragment个数,对应的测序饱和度,对应的每个cell下的唯一fragment个数的中值
 
 图表文件:
 * ABC.BeadBarcodeKneeCurve.html
