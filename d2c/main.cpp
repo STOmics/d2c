@@ -42,144 +42,74 @@ int main(int argc, char** argv)
     app.footer(string(APP_NAME) + " version: " + APP_VERSION);
     app.get_formatter()->column_width(40);
 
+    // Require and only require single subcommand
+    app.require_subcommand(1);
+
+    auto sub_count = app.add_subcommand("count", "count");
+    auto sub_reanno = app.add_subcommand("reanno", "reannotate");
+    sub_count->fallthrough();
+    sub_reanno->fallthrough();
+
     // Required parameters
     string input_bam, output_path;
     app.add_option("-i", input_bam, "Input bam filename")->check(CLI::ExistingFile)->required();
     app.add_option("-o", output_path, "Output result path")->required();
 
     // Optional parameters
-    string barcode_list = (exe_path / "barcode.list").string();
-    app.add_option("-b", barcode_list, "Barcode list file")->check(CLI::ExistingFile);
     string barcode_tag = "XB";
     app.add_option("--bt", barcode_tag, "Barcode tag in bam file, default 'XB'");
-    int mapq = 30;
-    app.add_option("--mapq", mapq, "Filter thrshold of mapping quality, default 30");
-    int cores = 0;
-    app.add_option("-c", cores, "CPU core number, default detect");
-    string run_name;
-    app.add_option("-n", run_name, "Name for the all output files, default prefix of input bam file");
-
-    bool tn5 = false;
-    app.add_flag("--tn5", tn5, "Process data knowing that the barcodes were generated with a barcoded Tn5");
-    double min_barcode_frags = 0.0;
-    app.add_option("--bf", min_barcode_frags, "Minimum number of fragments to be thresholded for doublet merging");
-    double min_jaccard_index = 0.0;
-    app.add_option("--ji", min_jaccard_index, "Minimum jaccard index for collapsing bead barcodes to cell barcodes");
-
     string log_path = "logs";
     app.add_option("--log", log_path, "Set logging path, default is './logs'");
 
+    string barcode_list = (exe_path / "barcode.list").string();
+    sub_count->add_option("-b", barcode_list, "Barcode list file")->check(CLI::ExistingFile);
+    int mapq = 30;
+    sub_count->add_option("--mapq", mapq, "Filter thrshold of mapping quality, default 30");
+    int cores = 0;
+    sub_count->add_option("-c", cores, "CPU core number, default detect");
+    string run_name;
+    sub_count->add_option("-n", run_name, "Name for the all output files, default prefix of input bam file");
+
+    bool tn5 = false;
+    sub_count->add_flag("--tn5", tn5, "Process data knowing that the barcodes were generated with a barcoded Tn5");
+    double min_barcode_frags = 0.0;
+    sub_count->add_option("--bf", min_barcode_frags, "Minimum number of fragments to be thresholded for doublet merging");
+    double min_jaccard_index = 0.0;
+    sub_count->add_option("--ji", min_jaccard_index, "Minimum jaccard index for collapsing bead barcodes to cell barcodes");
+
     // Model organism
     string ref = "hg19";
-    app.add_option("-r", ref, "Specify supported reference genome, default hg19");
+    sub_count->add_option("-r", ref, "Specify supported reference genome, default hg19");
 
     // Non-model organism
     string mito_chr, bed_genome_file, blacklist_file, trans_file;
-    app.add_option("--mc", mito_chr, "Name of the mitochondrial chromosome");
-    app.add_option("--bg", bed_genome_file, "Bedtools genome file")->check(CLI::ExistingFile);
-    app.add_option("--bl", blacklist_file, "Blacklist bed file")->check(CLI::ExistingFile);
-    app.add_option("--ts", trans_file, "Path bed file of transcription start sites")->check(CLI::ExistingFile);
+    sub_count->add_option("--mc", mito_chr, "Name of the mitochondrial chromosome");
+    sub_count->add_option("--bg", bed_genome_file, "Bedtools genome file")->check(CLI::ExistingFile);
+    sub_count->add_option("--bl", blacklist_file, "Blacklist bed file")->check(CLI::ExistingFile);
+    sub_count->add_option("--ts", trans_file, "Path bed file of transcription start sites")->check(CLI::ExistingFile);
 
     // Specific parameters
     int barcode_threshold = 0;
-    app.add_option("--bp", barcode_threshold,
+    sub_count->add_option("--bp", barcode_threshold,
                    "Top N number of fragments to be thresholded for doublet merging")
         ->check(CLI::PositiveNumber);
     int jaccard_threshold = 0;
-    app.add_option("--jp", jaccard_threshold,
+    sub_count->add_option("--jp", jaccard_threshold,
                    "Top N number of jaccard index for collapsing bead barcodes to cell barcodes")
         ->check(CLI::PositiveNumber);
 
     bool saturation_on = false;
-    app.add_flag("--sat", saturation_on, "Output sequencing saturation file, default False");
+    sub_count->add_flag("--sat", saturation_on, "Output sequencing saturation file, default False");
 
     string barcode_runname_list = "";
     // app.add_option("--br", barcode_runname_list, "Barcode runname list file, default detect")->check(CLI::ExistingFile);
 
+    // Reannotate specific parameters
+    string barcode_translate_file;
+    sub_reanno->add_option("-t", barcode_translate_file, "Translate file from cell barcode to drop barcode")
+        ->check(CLI::ExistingFile)->required();
+
     CLI11_PARSE(app, argc, argv);
-
-    // Make sure the parameters are valid
-    if (cores <= 0)
-        cores = std::thread::hardware_concurrency();
-    if (run_name.empty())
-        run_name = fs::path(input_bam).stem().string();
-    fs::path      ref_path = exe_path / "anno";
-    set< string > supported_genomes;
-    for (auto& p : fs::directory_iterator(ref_path / "bedtools"))
-    {
-        fs::path filename = p.path().filename();
-        if (filename.extension() != ".sizes")
-            continue;
-        string name = filename.stem().string();
-        if (name.substr(0, 6) == "chrom_")
-            supported_genomes.insert(name.substr(6));
-    }
-    // Check jaccard index is valid
-    if (min_jaccard_index > 1 || min_jaccard_index < 0)
-    {
-        cout << "User specified jaccard index > 1 or < 0:" << min_jaccard_index << endl;
-    }
-    // Handle reference genome
-    if (supported_genomes.count(ref) != 0)
-    {
-        cout << "Found designated reference genome:" << ref << endl;
-        if (trans_file.empty())
-            trans_file = ref_path / "TSS" / (ref + ".refGene.TSS.bed");
-        if (blacklist_file.empty())
-            blacklist_file = ref_path / "blacklist" / (ref + ".full.blacklist.bed");
-        if (bed_genome_file.empty())
-            bed_genome_file = ref_path / "bedtools" / ("chrom_" + ref + ".sizes");
-    }
-    else
-    {
-        cout << "Could not identify this reference genome:" << ref << endl;
-        cout << "Attempting to infer necessary input files from user specification" << endl;
-        if (bed_genome_file.empty() || blacklist_file.empty() || trans_file.empty())
-        {
-            cout << "Invalid parameters:--bg --bl --ts" << endl;
-            exit(1);
-        }
-    }
-
-    // Make sure mito chr is valid
-    if (mito_chr.empty())
-    {
-        if (ref == "hg19" || ref == "mm10" || ref == "hg38")
-            mito_chr = "chrM";
-        else if (ref == "GRCh37" || ref == "GRCh38" || ref == "GRCm37" || ref == "GRCm38")
-            mito_chr = "MT";
-        else if (ref == "hg19_mm10_c")
-            mito_chr = "humanM";
-        else
-            mito_chr = "hg19_chrM";
-    }
-    // Check the output path is valid
-    if (!fs::exists(output_path))
-    {
-        if (!fs::create_directories(fs::path(output_path)))
-        {
-            cout << "Failed to create directory: " << output_path << endl;
-            exit(1);
-        }
-    }
-
-    // Devel
-#ifdef DEVEL
-    for (auto& g : supported_genomes)
-        cout << g << endl;
-    cout << "cpu cores:" << cores << endl;
-    cout << "run name:" << run_name << endl;
-    cout << "bedtools:" << bed_genome_file << endl;
-    cout << "blacklist:" << blacklist_file << endl;
-    cout << "TSS:" << trans_file << endl;
-    cout << "mito chr:" << mito_chr << endl;
-#endif
-
-    // Figure out if the specified reference genome is a species mix
-    set< string > mix_species{ "hg19-mm10", "hg19_mm10_c", "hg19-mm10_nochr" };
-    bool          species_mix = false;
-    if (mix_species.count(ref) != 0)
-        species_mix = true;
 
     // Set the default logger to file logger.
     std::time_t        t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
@@ -204,30 +134,125 @@ int main(int argc, char** argv)
     spdlog::flush_on(spdlog::level::info);
     spdlog::set_pattern("%Y-%m-%d %H:%M:%S.%e %L %n: %v");
 
-    spdlog::get("main")->info("{} input_bam:{} output_path:{} barcode_tag:{} "
-                              "mapq:{} cores:{} run_name:{} tn5:{} min_barcode_frags:{} min_jaccard_index:{} "
-                              "ref:{} mito_chr:{} bed_genome_file:{} blacklist_file:{} trans_file:{} "
-                              "species_mix:{} barcode_threshold:{} jaccard_threshold:{} saturation_on:{} "
-                              "barcode_list:{} barcode_runname_list:{}",
-                              argv[0], input_bam, output_path, barcode_tag, mapq, cores, run_name, tn5,
-                              min_barcode_frags, min_jaccard_index, ref, mito_chr, bed_genome_file, blacklist_file,
-                              trans_file, species_mix, barcode_threshold, jaccard_threshold, saturation_on,
-                              barcode_list, barcode_runname_list);
+    if (sub_count->parsed())
+    {
+        // Make sure the parameters are valid
+        if (cores <= 0)
+            cores = std::thread::hardware_concurrency();
+        if (run_name.empty())
+            run_name = fs::path(input_bam).stem().string();
+        fs::path      ref_path = exe_path / "anno";
+        set< string > supported_genomes;
+        for (auto& p : fs::directory_iterator(ref_path / "bedtools"))
+        {
+            fs::path filename = p.path().filename();
+            if (filename.extension() != ".sizes")
+                continue;
+            string name = filename.stem().string();
+            if (name.substr(0, 6) == "chrom_")
+                supported_genomes.insert(name.substr(6));
+        }
+        // Check jaccard index is valid
+        if (min_jaccard_index > 1 || min_jaccard_index < 0)
+        {
+            cout << "User specified jaccard index > 1 or < 0:" << min_jaccard_index << endl;
+        }
+        // Handle reference genome
+        if (supported_genomes.count(ref) != 0)
+        {
+            cout << "Found designated reference genome:" << ref << endl;
+            if (trans_file.empty())
+                trans_file = ref_path / "TSS" / (ref + ".refGene.TSS.bed");
+            if (blacklist_file.empty())
+                blacklist_file = ref_path / "blacklist" / (ref + ".full.blacklist.bed");
+            if (bed_genome_file.empty())
+                bed_genome_file = ref_path / "bedtools" / ("chrom_" + ref + ".sizes");
+        }
+        else
+        {
+            cout << "Could not identify this reference genome:" << ref << endl;
+            cout << "Attempting to infer necessary input files from user specification" << endl;
+            if (bed_genome_file.empty() || blacklist_file.empty() || trans_file.empty())
+            {
+                cout << "Invalid parameters:--bg --bl --ts" << endl;
+                exit(1);
+            }
+        }
 
-    D2C d2c = D2C(input_bam, output_path, barcode_tag, mapq, cores, run_name, tn5, min_barcode_frags, min_jaccard_index,
-                  ref, mito_chr, bed_genome_file, blacklist_file, trans_file, species_mix, exe_path.string(),
-                  barcode_threshold, jaccard_threshold, saturation_on, barcode_list, barcode_runname_list);
-    try
-    {
-        d2c.run();
+        // Make sure mito chr is valid
+        if (mito_chr.empty())
+        {
+            if (ref == "hg19" || ref == "mm10" || ref == "hg38")
+                mito_chr = "chrM";
+            else if (ref == "GRCh37" || ref == "GRCh38" || ref == "GRCm37" || ref == "GRCm38")
+                mito_chr = "MT";
+            else if (ref == "hg19_mm10_c")
+                mito_chr = "humanM";
+            else
+                mito_chr = "hg19_chrM";
+        }
+        // Check the output path is valid
+        if (!fs::exists(output_path))
+        {
+            if (!fs::create_directories(fs::path(output_path)))
+            {
+                cout << "Failed to create directory: " << output_path << endl;
+                exit(1);
+            }
+        }
+
+        // Devel
+    #ifdef DEVEL
+        for (auto& g : supported_genomes)
+            cout << g << endl;
+        cout << "cpu cores:" << cores << endl;
+        cout << "run name:" << run_name << endl;
+        cout << "bedtools:" << bed_genome_file << endl;
+        cout << "blacklist:" << blacklist_file << endl;
+        cout << "TSS:" << trans_file << endl;
+        cout << "mito chr:" << mito_chr << endl;
+    #endif
+
+        // Figure out if the specified reference genome is a species mix
+        set< string > mix_species{ "hg19-mm10", "hg19_mm10_c", "hg19-mm10_nochr" };
+        bool          species_mix = false;
+        if (mix_species.count(ref) != 0)
+            species_mix = true;
+
+        spdlog::get("main")->info("{} input_bam:{} output_path:{} barcode_tag:{} "
+                                "mapq:{} cores:{} run_name:{} tn5:{} min_barcode_frags:{} min_jaccard_index:{} "
+                                "ref:{} mito_chr:{} bed_genome_file:{} blacklist_file:{} trans_file:{} "
+                                "species_mix:{} barcode_threshold:{} jaccard_threshold:{} saturation_on:{} "
+                                "barcode_list:{} barcode_runname_list:{}",
+                                argv[0], input_bam, output_path, barcode_tag, mapq, cores, run_name, tn5,
+                                min_barcode_frags, min_jaccard_index, ref, mito_chr, bed_genome_file, blacklist_file,
+                                trans_file, species_mix, barcode_threshold, jaccard_threshold, saturation_on,
+                                barcode_list, barcode_runname_list);
+
+        D2C d2c = D2C(input_bam, output_path, barcode_tag, mapq, cores, run_name, tn5, min_barcode_frags, min_jaccard_index,
+                    ref, mito_chr, bed_genome_file, blacklist_file, trans_file, species_mix, exe_path.string(),
+                    barcode_threshold, jaccard_threshold, saturation_on, barcode_list, barcode_runname_list);
+        try
+        {
+            d2c.run();
+        }
+        catch (std::exception& e)
+        {
+            spdlog::error("Error: {}", e.what());
+        }
+        catch (...)
+        {
+            spdlog::error("Unknown error");
+        }
     }
-    catch (std::exception& e)
+    else if (sub_reanno->parsed())
     {
-        spdlog::error("Error: {}", e.what());
+        cout<<"subcommand reanno"<<endl;
     }
-    catch (...)
+    else
     {
-        spdlog::error("Unknown error");
+        cerr<<"Undefined subcommand."<<endl;
+        return -1;
     }
 
     cout << "Finish process." << endl;
