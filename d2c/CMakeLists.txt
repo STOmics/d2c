@@ -18,6 +18,7 @@ set (src
     samReader.cpp
     bamCat.cpp
     saturation.cpp
+    reannotate.cpp
 
     main.cpp
     )

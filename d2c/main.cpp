@@ -8,6 +8,7 @@
  */
 
 #include "d2c.h"
+#include "reannotate.h"
 #include <taskflow/taskflow.hpp>
 
 #include <ctime>
@@ -45,8 +46,8 @@ int main(int argc, char** argv)
     // Require and only require single subcommand
     app.require_subcommand(1);
 
-    auto sub_count = app.add_subcommand("count", "count");
-    auto sub_reanno = app.add_subcommand("reanno", "reannotate");
+    auto sub_count = app.add_subcommand("count", "Drop barcode to Cell barcode");
+    auto sub_reanno = app.add_subcommand("reanno", "Reannotate bam file using barcode translate file");
     sub_count->fallthrough();
     sub_reanno->fallthrough();
 
@@ -60,6 +61,8 @@ int main(int argc, char** argv)
     app.add_option("--bt", barcode_tag, "Barcode tag in bam file, default 'XB'");
     string log_path = "logs";
     app.add_option("--log", log_path, "Set logging path, default is './logs'");
+    string run_name;
+    app.add_option("-n", run_name, "Name for the all output files, default prefix of input bam file");
 
     string barcode_list = (exe_path / "barcode.list").string();
     sub_count->add_option("-b", barcode_list, "Barcode list file")->check(CLI::ExistingFile);
@@ -67,9 +70,6 @@ int main(int argc, char** argv)
     sub_count->add_option("--mapq", mapq, "Filter thrshold of mapping quality, default 30");
     int cores = 0;
     sub_count->add_option("-c", cores, "CPU core number, default detect");
-    string run_name;
-    sub_count->add_option("-n", run_name, "Name for the all output files, default prefix of input bam file");
-
     bool tn5 = false;
     sub_count->add_flag("--tn5", tn5, "Process data knowing that the barcodes were generated with a barcoded Tn5");
     double min_barcode_frags = 0.0;
@@ -106,7 +106,7 @@ int main(int argc, char** argv)
 
     // Reannotate specific parameters
     string barcode_translate_file;
-    sub_reanno->add_option("-t", barcode_translate_file, "Translate file from cell barcode to drop barcode")
+    sub_reanno->add_option("-t", barcode_translate_file, "Translate file from drop barcode to cell barcode")
         ->check(CLI::ExistingFile)->required();
 
     CLI11_PARSE(app, argc, argv);
@@ -134,13 +134,24 @@ int main(int argc, char** argv)
     spdlog::flush_on(spdlog::level::info);
     spdlog::set_pattern("%Y-%m-%d %H:%M:%S.%e %L %n: %v");
 
+    // Get runname from the prefix of input bam if it is empty
+    if (run_name.empty())
+        run_name = fs::path(input_bam).stem().string();
+    // Check the output path is valid
+    if (!fs::exists(output_path))
+    {
+        if (!fs::create_directories(fs::path(output_path)))
+        {
+            cout << "Failed to create directory: " << output_path << endl;
+            exit(1);
+        }
+    }
+
     if (sub_count->parsed())
     {
         // Make sure the parameters are valid
         if (cores <= 0)
             cores = std::thread::hardware_concurrency();
-        if (run_name.empty())
-            run_name = fs::path(input_bam).stem().string();
         fs::path      ref_path = exe_path / "anno";
         set< string > supported_genomes;
         for (auto& p : fs::directory_iterator(ref_path / "bedtools"))
@@ -191,16 +202,7 @@ int main(int argc, char** argv)
             else
                 mito_chr = "hg19_chrM";
         }
-        // Check the output path is valid
-        if (!fs::exists(output_path))
-        {
-            if (!fs::create_directories(fs::path(output_path)))
-            {
-                cout << "Failed to create directory: " << output_path << endl;
-                exit(1);
-            }
-        }
-
+        
         // Devel
     #ifdef DEVEL
         for (auto& g : supported_genomes)
@@ -247,7 +249,13 @@ int main(int argc, char** argv)
     }
     else if (sub_reanno->parsed())
     {
-        cout<<"subcommand reanno"<<endl;
+        spdlog::get("main")->info("{} input_bam:{} output_path:{} barcode_tag:{} runname:{} barcode_translate_file:{}",
+            argv[0], input_bam, output_path, barcode_tag, run_name,  barcode_translate_file);
+        fs::path output_bam(output_path);
+        output_bam /= run_name + ".bam";
+        bool ret = reannotate(input_bam, barcode_translate_file, output_bam.string(), barcode_tag);
+        if (!ret)
+            spdlog::get("main")->error("Reanno failed!");
     }
     else
     {
