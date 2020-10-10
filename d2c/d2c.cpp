@@ -29,7 +29,7 @@
 #include <htslib/tbx.h>
 
 // Control the standart of uniq fragments, BOTH mean start and end are both equal
-//#define UNIQ_FRAG_BOTH
+#define UNIQ_FRAG_BOTH
 
 // Samtools view's parameter
 const int FLAG       = 2;
@@ -970,7 +970,7 @@ int D2C::computeStatByChr(int chr_id)
     spp::sparse_hash_set< UniqBarcode >           uniq_frags;
     spp::sparse_hash_map< int, vector< int > >    overlap_start, overlap_end;
     spp::sparse_hash_map< size_t, vector< int > > overlap_both;
-    size_t                                        count = 0;
+    //size_t                                        count = 0;
     for (size_t i = 0; i < frags_pos.size(); ++i)
     {
         if (!frags_pos[i])
@@ -996,7 +996,7 @@ int D2C::computeStatByChr(int chr_id)
 #else
         overlap_start[start].push_back(barcode);
         overlap_end[end].push_back(barcode);
-        count += 2;
+        //count += 2;
 #endif
     }
     // spdlog::debug("uniq_frags.size: {} count: {}", uniq_frags.size(), count);
