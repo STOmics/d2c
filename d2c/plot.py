@@ -15,6 +15,13 @@ from plotly.subplots import make_subplots
 
 DEBUG = False
 
+PARAM_FILE               = ".d2cCutoff.tsv"
+IMPLICATED_BARCODES_FILE = ".CorrelationBarcodes.tsv.gz"
+BARCODE_QUANT_FILE       = ".barcodeCount.tsv"
+SAT_FILE                 = ".sequenceSaturation.tsv"
+
+FSEP = '\t'
+
 def scatterBarcode(filename, threshold, out_prefix):
     
     # barcode_counts = []
@@ -25,7 +32,7 @@ def scatterBarcode(filename, threshold, out_prefix):
 
     # barcode_counts.sort(reverse=True)
     start_time = time.time()
-    df = pd.read_csv(filename, names = ["barcode", "cnt"])
+    df = pd.read_csv(filename, names = ["barcode", "cnt"], sep = FSEP)
     df.sort_values(by="cnt", ascending=False, ignore_index=True, inplace=True)
     
     # Plot bead barcode knee
@@ -129,7 +136,7 @@ def scatterJaccard(filename, threshold, out_prefix):
         fh_in.readline()
         i = 1
         for line in fh_in:
-            line = line.decode().strip().split(',')
+            line = line.decode().strip().split(FSEP)
             barcode_counts.append(float(line[-2]))
             i += 1
             if i == 1000000:
@@ -210,7 +217,7 @@ def main(file_path, prefix):
     runname = os.path.join(file_path, prefix)
 
     start_time = time.time()
-    seq_sat_file = runname+'.sequenceSaturation.tsv'
+    seq_sat_file = runname + SAT_FILE
     print(f'seq_sat_file={seq_sat_file}')
     if os.path.exists(seq_sat_file):
         scatterSaturation(seq_sat_file, out_prefix)
@@ -219,7 +226,7 @@ def main(file_path, prefix):
             print(f"plot saturation time(s): {end_time-start_time}")
             start_time = time.time()
 
-    param_file = runname+'.d2cParam.csv'
+    param_file = runname + PARAM_FILE
     print(f'param_file={param_file}')
     if not os.path.exists(param_file):
         print("Not exists param file: ", param_file)
@@ -228,25 +235,25 @@ def main(file_path, prefix):
     params = {}
     with open(param_file) as fh_in:
         for line in fh_in:
-            line = line.strip().split(',')
+            line = line.strip().split(FSEP)
             params[line[0]] = float(line[1])
             
-    bead_file = runname+'.barcodeQuantSimple.csv'
+    bead_file = runname + BARCODE_QUANT_FILE
     print(f'bead_file={bead_file}')
-    if 'bead_threshold' in params and os.path.exists(bead_file):
-        bead_threshold = params['bead_threshold']
-        print(f'bead_threshold={bead_threshold}')
+    if 'bead_cutoff' in params and os.path.exists(bead_file):
+        bead_threshold = params['bead_cutoff']
+        print(f'bead_cutoff={bead_threshold}')
         scatterBarcode(bead_file, bead_threshold, out_prefix)
         if DEBUG:
             end_time = time.time()
             print(f"plot barcode time(s): {end_time-start_time}")
             start_time = time.time()
         
-    jaccard_file = runname+'.implicatedBarcodes.csv.gz'
+    jaccard_file = runname + IMPLICATED_BARCODES_FILE
     print(f'jaccard_file={jaccard_file}')
-    if 'jaccard_threshold' in params and os.path.exists(jaccard_file):
-        jaccard_threshold = params['jaccard_threshold']
-        print(f'jaccard_threshold={jaccard_threshold}')
+    if 'cor_cutoff' in params and os.path.exists(jaccard_file):
+        jaccard_threshold = params['cor_cutoff']
+        print(f'cor_cutoff={jaccard_threshold}')
         scatterJaccard(jaccard_file, jaccard_threshold, out_prefix)
         if DEBUG:
             end_time = time.time()

@@ -47,19 +47,21 @@ constexpr int RMASK = 0xFF;      // mask for get runname value
 
 // Filenames
 constexpr auto PLOT_SCRIPT              = "plot.pyc";
-constexpr auto BEAD_THRE_SCRIPT         = "10b_knee_execute.R";
-constexpr auto JACCARD_THRE_SCRIPT      = "11b_knee_execute.R";
-constexpr auto PARAM_FILE               = ".d2cParam.csv";
+// constexpr auto BEAD_THRE_SCRIPT         = "10b_knee_execute.R";
+// constexpr auto JACCARD_THRE_SCRIPT      = "11b_knee_execute.R";
+constexpr auto PARAM_FILE               = ".d2cCutoff.tsv";
 constexpr auto SAT_FILE                 = ".sequenceSaturation.tsv";
 constexpr auto FRAGMENT_FILE            = ".fragments.tsv.gz";
-constexpr auto BASIC_QC_FILE            = ".basicQC.tsv";
-constexpr auto BARCODE_QUANT_FILE       = ".barcodeQuantSimple.csv";
-constexpr auto HQ_BEADS_FILE            = ".HQbeads.tsv";
-constexpr auto JACCARD_TMP_FILE         = ".jaccard.csv";
-constexpr auto IMPLICATED_BARCODES_FILE = ".implicatedBarcodes.csv.gz";
-constexpr auto BARCODE_TRANSLATE_FILE   = ".barcodeTranslate.tsv";
-constexpr auto NC_STATS_FILE            = ".NCsumstats.tsv";
-constexpr auto QC_STATS_FILE            = ".QCstats.csv";
+// constexpr auto BASIC_QC_FILE            = ".basicQC.tsv";
+constexpr auto BARCODE_QUANT_FILE       = ".barcodeCount.tsv";
+// constexpr auto HQ_BEADS_FILE            = ".HQbeads.tsv";
+// constexpr auto JACCARD_TMP_FILE         = ".jaccard.csv";
+constexpr auto IMPLICATED_BARCODES_FILE = ".CorrelationBarcodes.tsv.gz";
+constexpr auto BARCODE_TRANSLATE_FILE   = ".barcodeMerge.tsv";
+// constexpr auto NC_STATS_FILE            = ".NCsumstats.tsv";
+constexpr auto QC_STATS_FILE            = ".Metadata.tsv";
+
+constexpr auto FSEP = '\t'; // seperator of lines in output file
 
 #include "ygg.hpp"
 
@@ -599,19 +601,19 @@ int D2C::taskflow()
                     _sum_stats.push_back(ss);
                 }
 
-                fs::path out_ss_file = output_path / (run_name + BASIC_QC_FILE);
-                FILE*    out_ss;
-                out_ss = fopen(out_ss_file.c_str(), "w");
-                string header =
-                    "cell_barcode\ttotalNuclearFrags\tuniqueNuclearFrags\ttotalMitoFrags\tuniqueMitoFrags\n";
-                fwrite(header.c_str(), 1, header.size(), out_ss);
-                for (auto& l : _sum_stats)
-                {
-                    string s = l.drop_barcode + '\t' + to_string(l.nuclear_total) + '\t' + to_string(l.nuclear_uniq)
-                               + '\t' + to_string(l.mito_total) + '\t' + to_string(l.mito_uniq) + '\n';
-                    fwrite(s.c_str(), 1, s.size(), out_ss);
-                }
-                fclose(out_ss);
+                // fs::path out_ss_file = output_path / (run_name + BASIC_QC_FILE);
+                // FILE*    out_ss;
+                // out_ss = fopen(out_ss_file.c_str(), "w");
+                // string header =
+                //     "cell_barcode\ttotalNuclearFrags\tuniqueNuclearFrags\ttotalMitoFrags\tuniqueMitoFrags\n";
+                // fwrite(header.c_str(), 1, header.size(), out_ss);
+                // for (auto& l : _sum_stats)
+                // {
+                //     string s = l.drop_barcode + '\t' + to_string(l.nuclear_total) + '\t' + to_string(l.nuclear_uniq)
+                //                + '\t' + to_string(l.mito_total) + '\t' + to_string(l.mito_uniq) + '\n';
+                //     fwrite(s.c_str(), 1, s.size(), out_ss);
+                // }
+                // fclose(out_ss);
 
                 spdlog::info("Simple qc time(s): {:.2f}", t.toc(1000));
             })
@@ -861,8 +863,8 @@ int D2C::determineHQBeads()
     for (auto& b : _total_bead_quant)
     // for (auto& b : _total_bead_order)
     {
-        string s = int2Barcode(b.first) + int2Runname(b.first) + "," + to_string(b.second) + "\n";
-        // string s = b + "," + to_string(_total_bead_quant[b]) + "\n";
+        string s = int2Barcode(b.first) + int2Runname(b.first) + FSEP + to_string(b.second) + "\n";
+        // string s = b + FSEP + to_string(_total_bead_quant[b]) + "\n";
         fwrite(s.c_str(), 1, s.size(), out_bead_quant);
     }
     fclose(out_bead_quant);
@@ -898,7 +900,7 @@ int D2C::determineHQBeads()
         min_barcode_frags = barcode_rank(cnts, INFLECTION_KERNEL_TYPE::DROPLETUTILS, CURVE_DATA_TYPE::BEAD);
     }
     
-    ofs << "bead_threshold," << min_barcode_frags << endl;
+    ofs << "bead_cutoff" << FSEP << min_barcode_frags << endl;
     ofs.close();
 
     // Do the filter
@@ -908,14 +910,14 @@ int D2C::determineHQBeads()
             _hq_beads.insert(p.first);
     }
     // Export high-quality beads
-    fs::path out_hq_file = output_path / (run_name + HQ_BEADS_FILE);
-    ofstream out_hq(out_hq_file.string(), std::ofstream::out);
-    for (auto& b : _hq_beads)
-        out_hq << int2Barcode(b) << int2Runname(b) << "\n";
-    out_hq.close();
+    // fs::path out_hq_file = output_path / (run_name + HQ_BEADS_FILE);
+    // ofstream out_hq(out_hq_file.string(), std::ofstream::out);
+    // for (auto& b : _hq_beads)
+    //     out_hq << int2Barcode(b) << int2Runname(b) << "\n";
+    // out_hq.close();
 
-    spdlog::debug("bead threshold: {}", min_barcode_frags);
-    spdlog::debug("total beads num: {} filter by min frags threshold: {}", _total_bead_quant.size(), _hq_beads.size());
+    spdlog::debug("bead cutoff: {}", min_barcode_frags);
+    spdlog::debug("total beads num: {} filter by min frags cutoff: {}", _total_bead_quant.size(), _hq_beads.size());
     return 0;
 }
 
@@ -1204,28 +1206,28 @@ int D2C::determineBarcodeMerge()
         min_jaccard_index = barcode_rank(cnts, INFLECTION_KERNEL_TYPE::DROPLETUTILS, CURVE_DATA_TYPE::JACCARD);
     }
 
-    ofs << "jaccard_threshold," << min_jaccard_index << endl;
+    ofs << "cor_cutoff"<< FSEP << min_jaccard_index << endl;
     ofs.close();
-    spdlog::debug("jaccard threshold: {}", min_jaccard_index);
+    spdlog::debug("cor cutoff: {}", min_jaccard_index);
 
     // Export the implicated barcodes
     cmpFile  tbl_out;
     fs::path implicated_barcode_file = output_path / (run_name + IMPLICATED_BARCODES_FILE);
     tbl_out                          = cmpOpen(implicated_barcode_file.c_str());
-    string header                    = "barc1,barc2,N_both,N_barc1,N_barc2,jaccard_frag,merged\n";
+    string header                    = "barcode1\tbarcode2\tFragnum_overlap\tFragnum_barcode1\tFragnum_barcode2\tjaccard_distance\tmerged\n";
     cmpFunc(tbl_out, header.c_str());
     for (size_t i = 0; i < ovdf.size(); ++i)
     {
         auto&  p  = ovdf[i];
         int    b1 = p.first >> 32;
         int    b2 = p.first & 0xFFFFFFFF;
-        string s  = int2Barcode(b1) + int2Runname(b1) + "," + int2Barcode(b2) + int2Runname(b2) + ",";
-        s += to_string(sum_dt[p.first]) + ",";
+        string s  = int2Barcode(b1) + int2Runname(b1) + FSEP + int2Barcode(b2) + int2Runname(b2) + FSEP;
+        s += to_string(sum_dt[p.first]) + FSEP;
 
         int N_barc1 = count_dict[b1];
         int N_barc2 = count_dict[b2];
-        s += to_string(N_barc1) + "," + to_string(N_barc2) + ",";
-        s += f2str(p.second, 5) + ",";
+        s += to_string(N_barc1) + FSEP + to_string(N_barc2) + FSEP;
+        s += f2str(p.second, 5) + FSEP;
         s += p.second >= min_jaccard_index ? "TRUE" : "FALSE";
         s += "\n";
 
@@ -1332,17 +1334,17 @@ int D2C::determineBarcodeMerge()
     }
     _total_nc_cnts.clear();
 
-    FILE*    nc_file_out;
-    fs::path nc_sum_file = output_path / (run_name + NC_STATS_FILE);
-    nc_file_out          = fopen(nc_sum_file.c_str(), "w");
-    header               = "NC_value\tNumberOfFragments\n";
-    fwrite(header.c_str(), 1, header.size(), nc_file_out);
-    for (auto& p : nc_data)
-    {
-        string s = to_string(p.first) + "\t" + to_string(p.second) + "\n";
-        fwrite(s.c_str(), 1, s.size(), nc_file_out);
-    }
-    fclose(nc_file_out);
+    // FILE*    nc_file_out;
+    // fs::path nc_sum_file = output_path / (run_name + NC_STATS_FILE);
+    // nc_file_out          = fopen(nc_sum_file.c_str(), "w");
+    // header               = "NC_value\tNumberOfFragments\n";
+    // fwrite(header.c_str(), 1, header.size(), nc_file_out);
+    // for (auto& p : nc_data)
+    // {
+    //     string s = to_string(p.first) + "\t" + to_string(p.second) + "\n";
+    //     fwrite(s.c_str(), 1, s.size(), nc_file_out);
+    // }
+    // fclose(nc_file_out);
     nc_data.clear();
 
     return 0;
@@ -1540,25 +1542,11 @@ int D2C::finalQC()
         // TODO(fxzhao): implement this option
     }
 
-    // Summarize frag attributes
-    for (auto& p : summary)
-    {
-        auto& sd = p.second;
-        sd.mean_insert_size =
-            std::accumulate(sd.insert_size.begin(), sd.insert_size.end(), 0.0) / sd.insert_size.size();
-        std::nth_element(sd.insert_size.begin(), sd.insert_size.begin() + int(0.5 * sd.insert_size.size()),
-                         sd.insert_size.end());
-        sd.median_insert_size = *(sd.insert_size.begin() + int(0.5 * sd.insert_size.size()));
-        sd.frip               = 0;
-        sd.tss_proportion     = sd.overlaps * 1.0 / sd.insert_size.size();
-    }
-
     for (auto& l : _sum_stats)
     {
         int nuclear_total = l.nuclear_total;
         int nuclear_uniq  = l.nuclear_uniq;
         l.dup_proportion  = get_dup_proportion(nuclear_total, nuclear_uniq);
-        l.library_size    = get_library_size(nuclear_total, nuclear_uniq);
     }
 
     // Add barcodes back if we need to (specified with the one to one option)
@@ -1577,8 +1565,7 @@ int D2C::finalQC()
     FILE*    qc_out;
     fs::path out_qc_file = output_path / (run_name + QC_STATS_FILE);
     qc_out               = fopen(out_qc_file.c_str(), "w");
-    string header        = "DropBarcode,totalNuclearFrags,uniqueNuclearFrags,totalMitoFrags,uniqueMitoFrags,"
-                    "duplicateProportion,librarySize,meanInsertSize,medianInsertSize,tssProportion,FRIP\n";
+    string header        = "CellBarcode\ttotalFrags\tuniqueFrags\ttotalMitoFrags\tuniqueMitoFrags\tduplicateProportion\tMitoProportion\n";
     fwrite(header.c_str(), 1, header.size(), qc_out);
     map< string, SummaryData >::iterator it;
     for (auto& l : _sum_stats)
@@ -1587,12 +1574,9 @@ int D2C::finalQC()
         if (it == summary.end())
             continue;
 
-        string s = l.drop_barcode + "," + to_string(l.nuclear_total) + "," + to_string(l.nuclear_uniq) + ","
-                   + to_string(l.mito_total) + "," + to_string(l.mito_uniq) + "," + f2str(l.dup_proportion, 3) + ","
-                   + to_string(l.library_size) + ",";
-        auto& sd = it->second;
-        s += f2str(sd.mean_insert_size, 1) + "," + to_string(sd.median_insert_size) + "," + f2str(sd.tss_proportion, 4)
-             + "," + f2str(sd.frip, 4) + "\n";
+        string s = l.drop_barcode + FSEP + to_string(l.nuclear_total) + FSEP + to_string(l.nuclear_uniq) + FSEP
+                   + to_string(l.mito_total) + FSEP + to_string(l.mito_uniq) + FSEP + f2str(l.dup_proportion, 3) + FSEP
+                   + f2str((l.mito_uniq*1.0)/l.nuclear_uniq, 3) + "\n";
         fwrite(s.c_str(), 1, s.size(), qc_out);
     }
     fclose(qc_out);
