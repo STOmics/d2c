@@ -39,24 +39,24 @@ Options:
   -n TEXT                               Name for the all output files, default prefix of input bam file
 
 Subcommands:
-  count                                 Drop barcode to Cell barcode
-  reanno                                Reannotate bam file using barcode translate file
+  merge                                 Drop barcode to Cell barcode
+  transid                                Reannotate bam file using barcode translate file
 
 D2C version: 1.3.0
 ```
 
 目前版本程序支持两个子命令,分别对应两个功能
 
-**count** 计算drop barcode对应的cell barcode  
-**reanno** 使用count计算的结果,对bam文件进行重新注释,添加cell barcode
+**merge** 计算drop barcode对应的cell barcode  
+**transid** 使用merge计算的结果,对bam文件进行重新注释,添加cell barcode
 
-每个子命令单独的参数可通过命令 **./bin/d2c count -h** 及 **./bin/d2c reanno -h** 查询
+每个子命令单独的参数可通过命令 **./bin/d2c merge -h** 及 **./bin/d2c transid -h** 查询
 
 ### 输出
 
 假设 run name 为 *ABC*, 正常情况在设置的 *-o* 路径输出结果文件
 
-#### **count** 子命令
+#### **merge** 子命令
 
 数据文件:
 * ABC.bam
@@ -85,7 +85,7 @@ D2C version: 1.3.0
 日志文件:
 * logs/D2C_20200813_140243.log 日志在程序目录下的logs文件夹,按程序启动时间建立文件名
 
-#### **reanno** 子命令
+#### **transid** 子命令
 
 数据文件:
 * ABC.bam
@@ -95,14 +95,14 @@ D2C version: 1.3.0
 
 ## 示例
 
-### **count** 子命令
+### **merge** 子命令
 
 模式生物
 
 除了三个必须参数之外,指定了barcode 标签为 *CB*, run name为 *ABC*, 过滤质量为 *20*, 参考基因组为 *mm10*, barcode后缀的run name列表文件 *runname.list* 
 
 ```
-./bin/d2c count \
+./bin/d2c merge \
     -i input.bam \
     -o output \
     -b barcode.list \
@@ -117,7 +117,7 @@ D2C version: 1.3.0
 与模式生物不同之处就是设置了 *--bg --bl --ts* 三个参数
 
 ```
-./bin/d2c count \
+./bin/d2c merge \
     -i input.bam \
     -o output \
     --mc chrMT \
@@ -130,10 +130,10 @@ D2C version: 1.3.0
     -b barcode.list
 ```
 
-### **reanno** 子命令
+### **transid** 子命令
 
 ```
-./bin/d2c reanno \
+./bin/d2c transid \
     -i sorted.bam \
     -o result \
     -t ABC.barcodeTranslate.tsv \

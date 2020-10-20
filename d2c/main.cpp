@@ -46,8 +46,8 @@ int main(int argc, char** argv)
     // Require and only require single subcommand
     app.require_subcommand(1);
 
-    auto sub_count = app.add_subcommand("count", "Drop barcode to Cell barcode");
-    auto sub_reanno = app.add_subcommand("reanno", "Reannotate bam file using barcode translate file");
+    auto sub_count = app.add_subcommand("merge", "Drop barcode to Cell barcode");
+    auto sub_reanno = app.add_subcommand("transid", "Reannotate bam file using barcode translate file");
     sub_count->fallthrough();
     sub_reanno->fallthrough();
 
@@ -255,7 +255,7 @@ int main(int argc, char** argv)
         output_bam /= run_name + ".bam";
         bool ret = reannotate(input_bam, barcode_translate_file, output_bam.string(), barcode_tag);
         if (!ret)
-            spdlog::get("main")->error("Reanno failed!");
+            spdlog::get("main")->error("Transform failed!");
     }
     else
     {
