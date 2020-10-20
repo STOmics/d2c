@@ -47,7 +47,7 @@ def scatterBarcode(filename, threshold, out_prefix):
         labels={"index": "Barcode in rank-descending order", "cnt":"Reads per barcode"}
     )
     
-    fig.update_layout(title_text="BeadBarcodeKnee", title_x=0.5)
+    fig.update_layout(title_text="BeadCalling", title_x=0.5)
     
     x_intercept_bead = len(df['cnt'][df['cnt'] > threshold])
     fig.add_shape(
@@ -63,65 +63,65 @@ def scatterBarcode(filename, threshold, out_prefix):
         print(f"plot barcode knee time(s): {end_time-start_time}")
         start_time = time.time()
 
-    # fig.write_image(out_prefix+".BeadBarcodeKnee.png")
+    # fig.write_image(out_prefix+".BeadCalling.png")
     if DEBUG:
         end_time = time.time()
         print(f"dump barcode knee time(s): {end_time-start_time}")
         start_time = time.time()
-    fig.write_html(out_prefix+".BeadBarcodeKnee.html")
+    fig.write_html(out_prefix+".BeadCalling.html")
     if DEBUG:
         end_time = time.time()
         print(f"dump barcode knee time(s): {end_time-start_time}")
         start_time = time.time()
 
     # Plot bead barcode knee density
-    df2 = log10(df[df["cnt"] > 50]["cnt"]+1)
-    fig = ff.create_distplot([df2], ['density'], show_hist=False, show_rug=False,
-                        curve_type='kde')
+    # df2 = log10(df[df["cnt"] > 50]["cnt"]+1)
+    # fig = ff.create_distplot([df2], ['density'], show_hist=False, show_rug=False,
+    #                     curve_type='kde')
                         
-    fig.update_xaxes(title="Count per barcode log10")
-    fig.update_yaxes(title="Density")
-    fig.update_layout(title_text="BeadBarcodeKneeDensity", title_x=0.5, showlegend=False)
+    # fig.update_xaxes(title="Count per barcode log10")
+    # fig.update_yaxes(title="Density")
+    # fig.update_layout(title_text="BeadBarcodeKneeDensity", title_x=0.5, showlegend=False)
     
-    x_intercept_bead_log = math.log10(x_intercept_bead)
-    fig.add_shape(
-            type="line", line_width=3, opacity=1,
-            x0=x_intercept_bead_log, x1=x_intercept_bead_log, xref="x", y0=0, y1=1, yref="paper"
-        )
+    # x_intercept_bead_log = math.log10(x_intercept_bead)
+    # fig.add_shape(
+    #         type="line", line_width=3, opacity=1,
+    #         x0=x_intercept_bead_log, x1=x_intercept_bead_log, xref="x", y0=0, y1=1, yref="paper"
+    #     )
 
-    # fig.write_image(out_prefix+".BeadBarcodeKneeDensity.png")
-    fig.write_html(out_prefix+".BeadBarcodeKneeDensity.html")
-    if DEBUG:
-        end_time = time.time()
-        print(f"plot density time(s): {end_time-start_time}")
-        start_time = time.time()
+    # # fig.write_image(out_prefix+".BeadBarcodeKneeDensity.png")
+    # fig.write_html(out_prefix+".BeadBarcodeKneeDensity.html")
+    # if DEBUG:
+    #     end_time = time.time()
+    #     print(f"plot density time(s): {end_time-start_time}")
+    #     start_time = time.time()
 
-    # Plot bead barcode knee curve
-    df["cumsum"] = df["cnt"].cumsum()
-    fig = px.line(df, x=df.index, y="cumsum")
-    fig.add_shape(
-        type="line", line_color="LightSeaGreen", line_width=1, opacity=1,
-        x0=threshold, x1=threshold, xref="x", y0=0, y1=1, yref="paper"
-    )
-    fig.update_xaxes(title="Barcode rank")
-    fig.update_yaxes(title="Cumulative read count")
-    fig.update_layout(title_text="BeadBarcodeKneeCurve", title_x=0.5, showlegend=False)
+    # # Plot bead barcode knee curve
+    # df["cumsum"] = df["cnt"].cumsum()
+    # fig = px.line(df, x=df.index, y="cumsum")
+    # fig.add_shape(
+    #     type="line", line_color="LightSeaGreen", line_width=1, opacity=1,
+    #     x0=threshold, x1=threshold, xref="x", y0=0, y1=1, yref="paper"
+    # )
+    # fig.update_xaxes(title="Barcode rank")
+    # fig.update_yaxes(title="Cumulative read count")
+    # fig.update_layout(title_text="BeadBarcodeKneeCurve", title_x=0.5, showlegend=False)
 
-    if DEBUG:
-        end_time = time.time()
-        print(f"plot curve time(s): {end_time-start_time}")
-        start_time = time.time()
+    # if DEBUG:
+    #     end_time = time.time()
+    #     print(f"plot curve time(s): {end_time-start_time}")
+    #     start_time = time.time()
 
-    # fig.write_image(out_prefix+".BeadBarcodeKneeCurve.png")
-    if DEBUG:
-        end_time = time.time()
-        print(f"dump curve time(s): {end_time-start_time}")
-        start_time = time.time()
-    fig.write_html(out_prefix+".BeadBarcodeKneeCurve.html")
-    if DEBUG:
-        end_time = time.time()
-        print(f"dump curve time(s): {end_time-start_time}")
-        start_time = time.time()
+    # # fig.write_image(out_prefix+".BeadBarcodeKneeCurve.png")
+    # if DEBUG:
+    #     end_time = time.time()
+    #     print(f"dump curve time(s): {end_time-start_time}")
+    #     start_time = time.time()
+    # fig.write_html(out_prefix+".BeadBarcodeKneeCurve.html")
+    # if DEBUG:
+    #     end_time = time.time()
+    #     print(f"dump curve time(s): {end_time-start_time}")
+    #     start_time = time.time()
     
 def scatterJaccard(filename, threshold, out_prefix):
     barcode_counts = []
@@ -148,7 +148,7 @@ def scatterJaccard(filename, threshold, out_prefix):
         color="PassKnee",
         labels={"index": "d2c overlap score in rank-descending order", "cnt":"d2c overlap score per barcode pair"}
     )
-    fig.update_layout(title_text="JaccardOverlapKnee", title_x=0.5)
+    fig.update_layout(title_text="CorCalling", title_x=0.5)
     
     x_intercept_bead = len(df['cnt'][df['cnt'] > threshold])
     fig.add_shape(
@@ -160,11 +160,9 @@ def scatterJaccard(filename, threshold, out_prefix):
         x0=x_intercept_bead, x1=x_intercept_bead, xref="x", y0=0, y1=1, yref="paper"
     )
     
-    # fig.write_image(out_prefix+".JaccardOverlapKnee.png")
-    fig.write_html(out_prefix+".JaccardOverlapKnee.html")
+    # fig.write_image(out_prefix+".CorCalling.png")
+    fig.write_html(out_prefix+".CorCalling.html")
     
-    
-
 def scatterSaturation(filename, out_prefix):
     x = [0]
     y = [[0],[0]]
