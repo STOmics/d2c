@@ -78,8 +78,8 @@ int main(int argc, char** argv)
     sub_count->add_option("--ji", min_jaccard_index, "Minimum jaccard index for collapsing bead barcodes to cell barcodes");
 
     // Model organism
-    string ref = "hg19";
-    sub_count->add_option("-r", ref, "Specify supported reference genome, default hg19");
+    string ref = "";
+    sub_count->add_option("-r", ref, "Specify supported reference genome, default None");
 
     // Non-model organism
     string mito_chr, bed_genome_file, blacklist_file, trans_file;
@@ -181,13 +181,14 @@ int main(int argc, char** argv)
         }
         else
         {
-            cout << "Could not identify this reference genome:" << ref << endl;
-            cout << "Attempting to infer necessary input files from user specification" << endl;
-            if (bed_genome_file.empty() || blacklist_file.empty() || trans_file.empty())
-            {
-                cout << "Invalid parameters:--bg --bl --ts" << endl;
-                exit(1);
-            }
+            // Allow no clear reference parameter
+            // cout << "Could not identify this reference genome:" << ref << endl;
+            // cout << "Attempting to infer necessary input files from user specification" << endl;
+            // if (bed_genome_file.empty() || blacklist_file.empty() || trans_file.empty())
+            // {
+            //     cout << "Invalid parameters:--bg --bl --ts" << endl;
+            //     exit(1);
+            // }
         }
 
         // Make sure mito chr is valid
@@ -199,8 +200,9 @@ int main(int argc, char** argv)
                 mito_chr = "MT";
             else if (ref == "hg19_mm10_c")
                 mito_chr = "humanM";
-            else
-                mito_chr = "hg19_chrM";
+            // Remove the default mito chr
+            // else
+            //     mito_chr = "hg19_chrM";
         }
         
         // Devel

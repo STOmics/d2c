@@ -344,6 +344,11 @@ int D2C::taskflow()
 
     // Verify that the supplied reference genome and the bam have overlapping chromosomes
     auto bed_chrs = parseChrsFromBedFile();
+    if (bed_chrs.empty())
+    {
+        for (auto& ctg : _contig_names)
+            bed_chrs.emplace(ctg, "");
+    }
     spdlog::debug("bed_chrs num: {}", bed_chrs.size());
 
     vector< int > used_chrs;
@@ -581,26 +586,28 @@ int D2C::taskflow()
                     }
                     _frag_stats[chr_id].clear();
                 }
-                assert(mito_pos != -1);
-                auto&                                     mito = _frag_stats[mito_pos];
-                map< string, pair< int, int > >::iterator it;
-                for (auto& p : mito)
+                // May not have mito chr
+                if (mito_pos != -1)
                 {
-                    if (p.second.first == 0 || p.second.second == 0)
-                        continue;
-                    it = nuclear.find(p.first);
-                    if (it == nuclear.end())
-                        continue;
+                    auto&                                     mito = _frag_stats[mito_pos];
+                    map< string, pair< int, int > >::iterator it;
+                    for (auto& p : mito)
+                    {
+                        if (p.second.first == 0 || p.second.second == 0)
+                            continue;
+                        it = nuclear.find(p.first);
+                        if (it == nuclear.end())
+                            continue;
 
-                    SumStat ss;
-                    ss.drop_barcode  = p.first;
-                    ss.nuclear_total = it->second.first;
-                    ss.nuclear_uniq  = it->second.second;
-                    ss.mito_total    = p.second.first;
-                    ss.mito_uniq     = p.second.second;
-                    _sum_stats.push_back(ss);
+                        SumStat ss;
+                        ss.drop_barcode  = p.first;
+                        ss.nuclear_total = it->second.first;
+                        ss.nuclear_uniq  = it->second.second;
+                        ss.mito_total    = p.second.first;
+                        ss.mito_uniq     = p.second.second;
+                        _sum_stats.push_back(ss);
+                    }
                 }
-
                 // fs::path out_ss_file = output_path / (run_name + BASIC_QC_FILE);
                 // FILE*    out_ss;
                 // out_ss = fopen(out_ss_file.c_str(), "w");
@@ -734,33 +741,35 @@ int D2C::splitBamByChr(int chr_id)
     // }
 
     // Load blacklist file and construct interval tree
-    ifstream       blf(blacklist_file, std::ifstream::in);
-    vector< Node > nodes;
-    string         line;
-    while (std::getline(blf, line))
-    {
-        vector< string > vec_str = split_str(line, '\t');
-        if (vec_str.size() != 3)
-            continue;
-        string chr = vec_str[0];
-        if (chr != chr_str)
-            continue;
-        int  start = stoi(vec_str[1]);
-        int  end   = stoi(vec_str[2]);
-        Node node;
-        node.lower = start;
-        node.upper = end;
-        node.value = chr;
-        nodes.push_back(std::move(node));
-    }
-    blf.close();
-
     MyTree mytree;
-    for (auto& node : nodes)
+    if (fs::exists(blacklist_file))
     {
-        mytree.insert(node);
-    }
+        ifstream       blf(blacklist_file, std::ifstream::in);
+        vector< Node > nodes;
+        string         line;
+        while (std::getline(blf, line))
+        {
+            vector< string > vec_str = split_str(line, '\t');
+            if (vec_str.size() != 3)
+                continue;
+            string chr = vec_str[0];
+            if (chr != chr_str)
+                continue;
+            int  start = stoi(vec_str[1]);
+            int  end   = stoi(vec_str[2]);
+            Node node;
+            node.lower = start;
+            node.upper = end;
+            node.value = chr;
+            nodes.push_back(std::move(node));
+        }
+        blf.close();
 
+        for (auto& node : nodes)
+        {
+            mytree.insert(node);
+        }
+    }
     // set< UniqBarcode > pcr_dup;
     spp::sparse_hash_set< UniqBarcode > pcr_dup;
     // unordered_set<string> pcr_dup;
@@ -824,6 +833,8 @@ int D2C::splitBamByChr(int chr_id)
 map< string, string > D2C::parseChrsFromBedFile()
 {
     map< string, string > chrs;
+    if (!fs::exists(bed_genome_file)) return chrs;
+
     ifstream              ifs(bed_genome_file, std::ifstream::in);
     string                line;
     while (std::getline(ifs, line))
@@ -1487,26 +1498,29 @@ int D2C::annotateBamByChr(int chr_id)
 int D2C::finalQC()
 {
     // Load tss file for finding overlaps
-    ifstream       tss_ifs(trans_file, std::ifstream::in);
-    string         line;
-    vector< Node > nodes;
-    while (std::getline(tss_ifs, line))
-    {
-        vector< string > vec_s = split_str(line, '\t');
-        if (vec_s.size() < 3)
-            continue;
-
-        Node node;
-        node.lower = stoi(vec_s[1]) - 1000;
-        node.upper = stoi(vec_s[2]) + 1000;
-        node.value = vec_s[0];
-        nodes.push_back(std::move(node));
-    }
-
     map< string, MyTree > mytrees;
-    for (auto& node : nodes)
+    vector< Node > nodes;
+    if (fs::exists(trans_file))
     {
-        mytrees[node.value].insert(node);
+        ifstream       tss_ifs(trans_file, std::ifstream::in);
+        string         line;
+        while (std::getline(tss_ifs, line))
+        {
+            vector< string > vec_s = split_str(line, '\t');
+            if (vec_s.size() < 3)
+                continue;
+
+            Node node;
+            node.lower = stoi(vec_s[1]) - 1000;
+            node.upper = stoi(vec_s[2]) + 1000;
+            node.value = vec_s[0];
+            nodes.push_back(std::move(node));
+        }
+
+        for (auto& node : nodes)
+        {
+            mytrees[node.value].insert(node);
+        }
     }
 
     // Store has_overlap and insert size as pair
