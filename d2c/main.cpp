@@ -30,7 +30,7 @@ namespace fs = std::filesystem;
 
 //#define DEVEL
 constexpr auto APP_NAME    = "D2C";
-constexpr auto APP_VERSION = "1.3.0";
+constexpr auto APP_VERSION = "1.3.1";
 
 int main(int argc, char** argv)
 {
@@ -46,7 +46,7 @@ int main(int argc, char** argv)
     // Require and only require single subcommand
     app.require_subcommand(1);
 
-    auto sub_count = app.add_subcommand("merge", "Drop barcode to Cell barcode");
+    auto sub_count  = app.add_subcommand("merge", "Drop barcode to Cell barcode");
     auto sub_reanno = app.add_subcommand("transid", "Reannotate bam file using barcode translate file");
     sub_count->fallthrough();
     sub_reanno->fallthrough();
@@ -57,8 +57,10 @@ int main(int argc, char** argv)
     app.add_option("-o", output_path, "Output result path")->required();
 
     // Optional parameters
-    string barcode_tag = "XB";
-    app.add_option("--bt", barcode_tag, "Barcode tag in bam file, default 'XB'");
+    string barcode_in_tag = "XB";
+    app.add_option("--bt1", barcode_in_tag, "Barcode tag in input bam file, default 'XB'");
+    string barcode_out_tag = "DB";
+    app.add_option("--bt2", barcode_out_tag, "Barcode tag in output bam file, default 'DB'");
     string log_path = "logs";
     app.add_option("--log", log_path, "Set logging path, default is './logs'");
     string run_name;
@@ -73,9 +75,11 @@ int main(int argc, char** argv)
     bool tn5 = false;
     sub_count->add_flag("--tn5", tn5, "Process data knowing that the barcodes were generated with a barcoded Tn5");
     double min_barcode_frags = 0.0;
-    sub_count->add_option("--bf", min_barcode_frags, "Minimum number of fragments to be thresholded for doublet merging");
+    sub_count->add_option("--bf", min_barcode_frags,
+                          "Minimum number of fragments to be thresholded for doublet merging");
     double min_jaccard_index = 0.0;
-    sub_count->add_option("--ji", min_jaccard_index, "Minimum jaccard index for collapsing bead barcodes to cell barcodes");
+    sub_count->add_option("--ji", min_jaccard_index,
+                          "Minimum jaccard index for collapsing bead barcodes to cell barcodes");
 
     // Model organism
     string ref = "";
@@ -90,24 +94,26 @@ int main(int argc, char** argv)
 
     // Specific parameters
     int barcode_threshold = 0;
-    sub_count->add_option("--bp", barcode_threshold,
-                   "Top N number of fragments to be thresholded for doublet merging")
+    sub_count->add_option("--bp", barcode_threshold, "Top N number of fragments to be thresholded for doublet merging")
         ->check(CLI::PositiveNumber);
     int jaccard_threshold = 0;
-    sub_count->add_option("--jp", jaccard_threshold,
-                   "Top N number of jaccard index for collapsing bead barcodes to cell barcodes")
+    sub_count
+        ->add_option("--jp", jaccard_threshold,
+                     "Top N number of jaccard index for collapsing bead barcodes to cell barcodes")
         ->check(CLI::PositiveNumber);
 
     bool saturation_on = false;
     sub_count->add_flag("--sat", saturation_on, "Output sequencing saturation file, default False");
 
     string barcode_runname_list = "";
-    // app.add_option("--br", barcode_runname_list, "Barcode runname list file, default detect")->check(CLI::ExistingFile);
+    // app.add_option("--br", barcode_runname_list, "Barcode runname list file, default
+    // detect")->check(CLI::ExistingFile);
 
     // Reannotate specific parameters
     string barcode_translate_file;
     sub_reanno->add_option("-t", barcode_translate_file, "Translate file from drop barcode to cell barcode")
-        ->check(CLI::ExistingFile)->required();
+        ->check(CLI::ExistingFile)
+        ->required();
 
     CLI11_PARSE(app, argc, argv);
 
@@ -204,9 +210,9 @@ int main(int argc, char** argv)
             // else
             //     mito_chr = "hg19_chrM";
         }
-        
+
         // Devel
-    #ifdef DEVEL
+#ifdef DEVEL
         for (auto& g : supported_genomes)
             cout << g << endl;
         cout << "cpu cores:" << cores << endl;
@@ -215,7 +221,7 @@ int main(int argc, char** argv)
         cout << "blacklist:" << blacklist_file << endl;
         cout << "TSS:" << trans_file << endl;
         cout << "mito chr:" << mito_chr << endl;
-    #endif
+#endif
 
         // Figure out if the specified reference genome is a species mix
         set< string > mix_species{ "hg19-mm10", "hg19_mm10_c", "hg19-mm10_nochr" };
@@ -223,19 +229,20 @@ int main(int argc, char** argv)
         if (mix_species.count(ref) != 0)
             species_mix = true;
 
-        spdlog::get("main")->info("{} input_bam:{} output_path:{} barcode_tag:{} "
-                                "mapq:{} cores:{} run_name:{} tn5:{} min_barcode_frags:{} min_jaccard_index:{} "
-                                "ref:{} mito_chr:{} bed_genome_file:{} blacklist_file:{} trans_file:{} "
-                                "species_mix:{} barcode_threshold:{} jaccard_threshold:{} saturation_on:{} "
-                                "barcode_list:{} barcode_runname_list:{}",
-                                argv[0], input_bam, output_path, barcode_tag, mapq, cores, run_name, tn5,
-                                min_barcode_frags, min_jaccard_index, ref, mito_chr, bed_genome_file, blacklist_file,
-                                trans_file, species_mix, barcode_threshold, jaccard_threshold, saturation_on,
-                                barcode_list, barcode_runname_list);
+        spdlog::get("main")->info("{} input_bam:{} output_path:{} barcode_in_tag:{} barcode_out_tag:{} "
+                                  "mapq:{} cores:{} run_name:{} tn5:{} min_barcode_frags:{} min_jaccard_index:{} "
+                                  "ref:{} mito_chr:{} bed_genome_file:{} blacklist_file:{} trans_file:{} "
+                                  "species_mix:{} barcode_threshold:{} jaccard_threshold:{} saturation_on:{} "
+                                  "barcode_list:{} barcode_runname_list:{}",
+                                  argv[0], input_bam, output_path, barcode_in_tag, barcode_out_tag, mapq, cores,
+                                  run_name, tn5, min_barcode_frags, min_jaccard_index, ref, mito_chr, bed_genome_file,
+                                  blacklist_file, trans_file, species_mix, barcode_threshold, jaccard_threshold,
+                                  saturation_on, barcode_list, barcode_runname_list);
 
-        D2C d2c = D2C(input_bam, output_path, barcode_tag, mapq, cores, run_name, tn5, min_barcode_frags, min_jaccard_index,
-                    ref, mito_chr, bed_genome_file, blacklist_file, trans_file, species_mix, exe_path.string(),
-                    barcode_threshold, jaccard_threshold, saturation_on, barcode_list, barcode_runname_list);
+        D2C d2c = D2C(input_bam, output_path, barcode_in_tag, barcode_out_tag, mapq, cores, run_name, tn5,
+                      min_barcode_frags, min_jaccard_index, ref, mito_chr, bed_genome_file, blacklist_file, trans_file,
+                      species_mix, exe_path.string(), barcode_threshold, jaccard_threshold, saturation_on, barcode_list,
+                      barcode_runname_list);
         try
         {
             d2c.run();
@@ -251,17 +258,19 @@ int main(int argc, char** argv)
     }
     else if (sub_reanno->parsed())
     {
-        spdlog::get("main")->info("{} input_bam:{} output_path:{} barcode_tag:{} runname:{} barcode_translate_file:{}",
-            argv[0], input_bam, output_path, barcode_tag, run_name,  barcode_translate_file);
+        spdlog::get("main")->info(
+            "{} input_bam:{} output_path:{} barcode_in_tag:{} barcode_out_tag:{} runname:{} barcode_translate_file:{}",
+            argv[0], input_bam, output_path, barcode_in_tag, barcode_out_tag, run_name, barcode_translate_file);
         fs::path output_bam(output_path);
-        output_bam /= run_name + ".bam";
-        bool ret = reannotate(input_bam, barcode_translate_file, output_bam.string(), barcode_tag);
+        // Add suffix so the input bam and output bam can be in the same directory
+        output_bam /= run_name + "_transid.bam";
+        bool ret = reannotate(input_bam, barcode_translate_file, output_bam.string(), barcode_in_tag, barcode_out_tag);
         if (!ret)
             spdlog::get("main")->error("Transform failed!");
     }
     else
     {
-        cerr<<"Undefined subcommand."<<endl;
+        cerr << "Undefined subcommand." << endl;
         return -1;
     }
 

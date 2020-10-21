@@ -38,10 +38,11 @@ struct SumStat
 class D2C
 {
 public:
-    D2C(string input_bam, string output_path, string barcode_tag, int mapq, int cores, string run_name, bool tn5,
-        double min_barcode_frags, double min_jaccard_index, string ref, string mito_chr, string bed_genome_file,
-        string blacklist_file, string trans_file, bool species_mix, string bin_path, int barcode_threshold,
-        int jaccard_threshold, bool saturation_on, string barcode_list, string barcode_runname_list);
+    D2C(string input_bam, string output_path, string barcode_in_tag, string barcode_out_tag, int mapq, int cores,
+        string run_name, bool tn5, double min_barcode_frags, double min_jaccard_index, string ref, string mito_chr,
+        string bed_genome_file, string blacklist_file, string trans_file, bool species_mix, string bin_path,
+        int barcode_threshold, int jaccard_threshold, bool saturation_on, string barcode_list,
+        string barcode_runname_list);
     ~D2C(){};
     int run();
     int taskflow();
@@ -70,6 +71,7 @@ private:
     string   input_bam;
     fs::path output_path;
     string   barcode_tag;
+    string   drop_tag;
     int      mapq, cores;
     string   run_name;
     bool     tn5;
@@ -79,7 +81,7 @@ private:
     string   bed_genome_file, blacklist_file, trans_file;
     bool     species_mix;
     fs::path bin_path;
-    int   barcode_threshold, jaccard_threshold;
+    int      barcode_threshold, jaccard_threshold;
     bool     saturation_on;
     string   barcode_list;
     string   barcode_runname_list;
@@ -89,7 +91,6 @@ private:
     int      regularize_threshold;  // Minimum number of inserts two barcodes must share to be counted per-chromosome
     bool     one_to_one;  // Enforce that each bead barcode maps to one unique drop barcode (cancels the merging)
     fs::path temp_bam_path;
-    string   drop_tag;
     string   peak_file;  // If supplied, compute FRIP (in QC stats) and generate Summarized Experiment
 
     // Shared data

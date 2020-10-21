@@ -13,4 +13,5 @@
 
 using namespace std;
 
-bool reannotate(string input_bam, string barcode_translate_file, string output_bam, string barcode_tag);
+bool reannotate(string input_bam, string barcode_translate_file, string output_bam, string barcode_in_tag,
+                string barcode_out_tag);

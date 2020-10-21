@@ -25,4 +25,5 @@ enum INFLECTION_KERNEL_TYPE
     DROPLETUTILS
 };
 
-double barcode_rank(vector< double >& input, INFLECTION_KERNEL_TYPE inflection_kernel_type, CURVE_DATA_TYPE curve_data_type);
+double barcode_rank(vector< double >& input, INFLECTION_KERNEL_TYPE inflection_kernel_type,
+                    CURVE_DATA_TYPE curve_data_type);

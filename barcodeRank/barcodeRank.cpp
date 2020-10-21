@@ -8,21 +8,22 @@
  */
 
 #include "barcodeRank.h"
-#include "kde.hpp"
 #include "inflection.h"
+#include "kde.hpp"
 
 #include <exception>
 
-double barcode_rank(vector< double >& input, INFLECTION_KERNEL_TYPE inflection_kernel_type, CURVE_DATA_TYPE curve_data_type)
+double barcode_rank(vector< double >& input, INFLECTION_KERNEL_TYPE inflection_kernel_type,
+                    CURVE_DATA_TYPE curve_data_type)
 {
     if (inflection_kernel_type == INFLECTION_KERNEL_TYPE::BAP2)
     {
-        KDE  kde;
-        pair<double, double> paras;
+        KDE                    kde;
+        pair< double, double > paras;
         if (curve_data_type == CURVE_DATA_TYPE::BEAD)
-            paras            = kde.run(input, "bead");
+            paras = kde.run(input, "bead");
         else if (curve_data_type == CURVE_DATA_TYPE::JACCARD)
-            paras            = kde.run(input, "jaccard");
+            paras = kde.run(input, "jaccard");
         else
             throw std::runtime_error("Error curve data type: " + to_string(curve_data_type));
         return paras.first;
@@ -33,7 +34,7 @@ double barcode_rank(vector< double >& input, INFLECTION_KERNEL_TYPE inflection_k
             return inflection(input, 500);
         else if (curve_data_type == CURVE_DATA_TYPE::JACCARD)
             return inflection(input, 0.005);
-        else 
+        else
             throw std::runtime_error("Error curve data type: " + to_string(curve_data_type));
     }
     else

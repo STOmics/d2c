@@ -46,22 +46,22 @@ constexpr int BMASK = 0xFFF;     // mask for get single bacode value
 constexpr int RMASK = 0xFF;      // mask for get runname value
 
 // Filenames
-constexpr auto PLOT_SCRIPT              = "plot.pyc";
+constexpr auto PLOT_SCRIPT = "plot.pyc";
 // constexpr auto BEAD_THRE_SCRIPT         = "10b_knee_execute.R";
 // constexpr auto JACCARD_THRE_SCRIPT      = "11b_knee_execute.R";
-constexpr auto PARAM_FILE               = ".d2cCutoff.tsv";
-constexpr auto SAT_FILE                 = ".sequenceSaturation.tsv";
-constexpr auto FRAGMENT_FILE            = ".fragments.tsv.gz";
+constexpr auto PARAM_FILE    = ".d2cCutoff.tsv";
+constexpr auto SAT_FILE      = ".sequenceSaturation.tsv";
+constexpr auto FRAGMENT_FILE = ".fragments.tsv.gz";
 // constexpr auto BASIC_QC_FILE            = ".basicQC.tsv";
-constexpr auto BARCODE_QUANT_FILE       = ".barcodeCount.tsv";
+constexpr auto BARCODE_QUANT_FILE = ".barcodeCount.tsv";
 // constexpr auto HQ_BEADS_FILE            = ".HQbeads.tsv";
 // constexpr auto JACCARD_TMP_FILE         = ".jaccard.csv";
 constexpr auto IMPLICATED_BARCODES_FILE = ".CorrelationBarcodes.tsv.gz";
 constexpr auto BARCODE_TRANSLATE_FILE   = ".barcodeMerge.tsv";
 // constexpr auto NC_STATS_FILE            = ".NCsumstats.tsv";
-constexpr auto QC_STATS_FILE            = ".Metadata.tsv";
+constexpr auto QC_STATS_FILE = ".Metadata.tsv";
 
-constexpr auto FSEP = '\t'; // seperator of lines in output file
+constexpr auto FSEP = '\t';  // seperator of lines in output file
 
 #include "ygg.hpp"
 
@@ -271,21 +271,21 @@ void D2C::extractBedPE(const BamRecord b1, const BamRecord b2, vector< Bedpe >& 
     }
 }
 
-D2C::D2C(string input_bam, string output_path, string barcode_tag, int mapq, int cores, string run_name, bool tn5,
-         double min_barcode_frags, double min_jaccard_index, string ref, string mito_chr, string bed_genome_file,
-         string blacklist_file, string trans_file, bool species_mix, string bin_path, int barcode_threshold,
-         int jaccard_threshold, bool saturation_on, string barcode_list, string barcode_runname_list)
-    : input_bam(input_bam), output_path(output_path), barcode_tag(barcode_tag), mapq(mapq), cores(cores),
-      run_name(run_name), tn5(tn5), min_barcode_frags(min_barcode_frags), min_jaccard_index(min_jaccard_index),
-      ref(ref), mito_chr(mito_chr), bed_genome_file(bed_genome_file), blacklist_file(blacklist_file),
-      trans_file(trans_file), species_mix(species_mix), bin_path(bin_path), barcode_threshold(barcode_threshold),
-      jaccard_threshold(jaccard_threshold), saturation_on(saturation_on), barcode_list(barcode_list),
-      barcode_runname_list(barcode_runname_list)
+D2C::D2C(string input_bam, string output_path, string barcode_in_tag, string barcode_out_tag, int mapq, int cores,
+         string run_name, bool tn5, double min_barcode_frags, double min_jaccard_index, string ref, string mito_chr,
+         string bed_genome_file, string blacklist_file, string trans_file, bool species_mix, string bin_path,
+         int barcode_threshold, int jaccard_threshold, bool saturation_on, string barcode_list,
+         string barcode_runname_list)
+    : input_bam(input_bam), output_path(output_path), barcode_tag(barcode_in_tag), drop_tag(barcode_out_tag),
+      mapq(mapq), cores(cores), run_name(run_name), tn5(tn5), min_barcode_frags(min_barcode_frags),
+      min_jaccard_index(min_jaccard_index), ref(ref), mito_chr(mito_chr), bed_genome_file(bed_genome_file),
+      blacklist_file(blacklist_file), trans_file(trans_file), species_mix(species_mix), bin_path(bin_path),
+      barcode_threshold(barcode_threshold), jaccard_threshold(jaccard_threshold), saturation_on(saturation_on),
+      barcode_list(barcode_list), barcode_runname_list(barcode_runname_list)
 {
     nc_threshold         = 6;
     regularize_threshold = 4;
     one_to_one           = false;
-    drop_tag             = "DB";
 }
 
 int D2C::run()
@@ -499,7 +499,7 @@ int D2C::taskflow()
                                      spdlog::info("Merge bam file success");
                                      // Build index file
                                      Timer index_timer;
-                                     auto bai_file(output_bam_file);
+                                     auto  bai_file(output_bam_file);
                                      bai_file += ".bai";
                                      if (fs::exists(bai_file))
                                          fs::remove(bai_file);
@@ -563,68 +563,68 @@ int D2C::taskflow()
     merge_frags.succeed(end_reanno);
 
     // Step 9: simple qc
-    auto simple_qc =
-        taskflow
-            .emplace([&]() {
-                Timer                           t;
-                map< string, pair< int, int > > nuclear;
-                int                             mito_pos = -1;
-                for (auto& chr_id : used_chrs)
-                {
-                    if (_contig_names[chr_id] == mito_chr)
-                    {
-                        mito_pos = chr_id;
-                        continue;
-                    }
+    auto simple_qc = taskflow
+                         .emplace([&]() {
+                             Timer                           t;
+                             map< string, pair< int, int > > nuclear;
+                             int                             mito_pos = -1;
+                             for (auto& chr_id : used_chrs)
+                             {
+                                 if (_contig_names[chr_id] == mito_chr)
+                                 {
+                                     mito_pos = chr_id;
+                                     continue;
+                                 }
 
-                    for (auto& p : _frag_stats[chr_id])
-                    {
-                        if (p.second.first == 0 || p.second.second == 0)
-                            continue;
-                        nuclear[p.first].first += p.second.first;
-                        nuclear[p.first].second += p.second.second;
-                    }
-                    _frag_stats[chr_id].clear();
-                }
-                // May not have mito chr
-                if (mito_pos != -1)
-                {
-                    auto&                                     mito = _frag_stats[mito_pos];
-                    map< string, pair< int, int > >::iterator it;
-                    for (auto& p : mito)
-                    {
-                        if (p.second.first == 0 || p.second.second == 0)
-                            continue;
-                        it = nuclear.find(p.first);
-                        if (it == nuclear.end())
-                            continue;
+                                 for (auto& p : _frag_stats[chr_id])
+                                 {
+                                     if (p.second.first == 0 || p.second.second == 0)
+                                         continue;
+                                     nuclear[p.first].first += p.second.first;
+                                     nuclear[p.first].second += p.second.second;
+                                 }
+                                 _frag_stats[chr_id].clear();
+                             }
+                             // May not have mito chr
+                             if (mito_pos != -1)
+                             {
+                                 auto&                                     mito = _frag_stats[mito_pos];
+                                 map< string, pair< int, int > >::iterator it;
+                                 for (auto& p : mito)
+                                 {
+                                     if (p.second.first == 0 || p.second.second == 0)
+                                         continue;
+                                     it = nuclear.find(p.first);
+                                     if (it == nuclear.end())
+                                         continue;
 
-                        SumStat ss;
-                        ss.drop_barcode  = p.first;
-                        ss.nuclear_total = it->second.first;
-                        ss.nuclear_uniq  = it->second.second;
-                        ss.mito_total    = p.second.first;
-                        ss.mito_uniq     = p.second.second;
-                        _sum_stats.push_back(ss);
-                    }
-                }
-                // fs::path out_ss_file = output_path / (run_name + BASIC_QC_FILE);
-                // FILE*    out_ss;
-                // out_ss = fopen(out_ss_file.c_str(), "w");
-                // string header =
-                //     "cell_barcode\ttotalNuclearFrags\tuniqueNuclearFrags\ttotalMitoFrags\tuniqueMitoFrags\n";
-                // fwrite(header.c_str(), 1, header.size(), out_ss);
-                // for (auto& l : _sum_stats)
-                // {
-                //     string s = l.drop_barcode + '\t' + to_string(l.nuclear_total) + '\t' + to_string(l.nuclear_uniq)
-                //                + '\t' + to_string(l.mito_total) + '\t' + to_string(l.mito_uniq) + '\n';
-                //     fwrite(s.c_str(), 1, s.size(), out_ss);
-                // }
-                // fclose(out_ss);
+                                     SumStat ss;
+                                     ss.drop_barcode  = p.first;
+                                     ss.nuclear_total = it->second.first;
+                                     ss.nuclear_uniq  = it->second.second;
+                                     ss.mito_total    = p.second.first;
+                                     ss.mito_uniq     = p.second.second;
+                                     _sum_stats.push_back(ss);
+                                 }
+                             }
+                             // fs::path out_ss_file = output_path / (run_name + BASIC_QC_FILE);
+                             // FILE*    out_ss;
+                             // out_ss = fopen(out_ss_file.c_str(), "w");
+                             // string header =
+                             //     "cell_barcode\ttotalNuclearFrags\tuniqueNuclearFrags\ttotalMitoFrags\tuniqueMitoFrags\n";
+                             // fwrite(header.c_str(), 1, header.size(), out_ss);
+                             // for (auto& l : _sum_stats)
+                             // {
+                             //     string s = l.drop_barcode + '\t' + to_string(l.nuclear_total) + '\t' +
+                             //     to_string(l.nuclear_uniq)
+                             //                + '\t' + to_string(l.mito_total) + '\t' + to_string(l.mito_uniq) + '\n';
+                             //     fwrite(s.c_str(), 1, s.size(), out_ss);
+                             // }
+                             // fclose(out_ss);
 
-                spdlog::info("Simple qc time(s): {:.2f}", t.toc(1000));
-            })
-            .name("Simple qc");
+                             spdlog::info("Simple qc time(s): {:.2f}", t.toc(1000));
+                         })
+                         .name("Simple qc");
     simple_qc.succeed(end_reanno);
 
     // Step 10: final qc
@@ -650,7 +650,7 @@ int D2C::taskflow()
     plot.succeed(barcode_merge);
     plot.succeed(determine_hq_beads);
     plot.succeed(sequence_saturation);
-    
+
     executor.run(taskflow).wait();
     // taskflow.dump(std::cout);
 
@@ -833,10 +833,11 @@ int D2C::splitBamByChr(int chr_id)
 map< string, string > D2C::parseChrsFromBedFile()
 {
     map< string, string > chrs;
-    if (!fs::exists(bed_genome_file)) return chrs;
+    if (!fs::exists(bed_genome_file))
+        return chrs;
 
-    ifstream              ifs(bed_genome_file, std::ifstream::in);
-    string                line;
+    ifstream ifs(bed_genome_file, std::ifstream::in);
+    string   line;
     while (std::getline(ifs, line))
     {
         vector< string > vec_s = split_str(line, '\t');
@@ -892,8 +893,9 @@ int D2C::determineHQBeads()
         {
             cnts.push_back(b.second);
         }
-        std::sort(cnts.begin(), cnts.end(), std::greater<double>());
-        min_barcode_frags = barcode_threshold <= static_cast<int>(cnts.size()) ? cnts[barcode_threshold-1] : cnts.back();
+        std::sort(cnts.begin(), cnts.end(), std::greater< double >());
+        min_barcode_frags =
+            barcode_threshold <= static_cast< int >(cnts.size()) ? cnts[barcode_threshold - 1] : cnts.back();
     }
     else if (min_barcode_frags != 0.0)
     {
@@ -907,10 +909,10 @@ int D2C::determineHQBeads()
         {
             cnts.push_back(b.second);
         }
-       
+
         min_barcode_frags = barcode_rank(cnts, INFLECTION_KERNEL_TYPE::DROPLETUTILS, CURVE_DATA_TYPE::BEAD);
     }
-    
+
     ofs << "bead_cutoff" << FSEP << min_barcode_frags << endl;
     ofs.close();
 
@@ -983,7 +985,7 @@ int D2C::computeStatByChr(int chr_id)
     spp::sparse_hash_set< UniqBarcode >           uniq_frags;
     spp::sparse_hash_map< int, vector< int > >    overlap_start, overlap_end;
     spp::sparse_hash_map< size_t, vector< int > > overlap_both;
-    //size_t                                        count = 0;
+    // size_t                                        count = 0;
     for (size_t i = 0; i < frags_pos.size(); ++i)
     {
         if (!frags_pos[i])
@@ -1009,7 +1011,7 @@ int D2C::computeStatByChr(int chr_id)
 #else
         overlap_start[start].push_back(barcode);
         overlap_end[end].push_back(barcode);
-        //count += 2;
+        // count += 2;
 #endif
     }
     // spdlog::debug("uniq_frags.size: {} count: {}", uniq_frags.size(), count);
@@ -1197,8 +1199,9 @@ int D2C::determineBarcodeMerge()
             cnts.push_back(ovdf[i].second);
         }
 
-        std::sort(cnts.begin(), cnts.end(), std::greater<double>());
-        min_jaccard_index = jaccard_threshold <= static_cast<int>(cnts.size()) ? cnts[jaccard_threshold-1] : cnts.back();
+        std::sort(cnts.begin(), cnts.end(), std::greater< double >());
+        min_jaccard_index =
+            jaccard_threshold <= static_cast< int >(cnts.size()) ? cnts[jaccard_threshold - 1] : cnts.back();
     }
     else if (min_jaccard_index != 0.0)
     {
@@ -1217,7 +1220,7 @@ int D2C::determineBarcodeMerge()
         min_jaccard_index = barcode_rank(cnts, INFLECTION_KERNEL_TYPE::DROPLETUTILS, CURVE_DATA_TYPE::JACCARD);
     }
 
-    ofs << "cor_cutoff"<< FSEP << min_jaccard_index << endl;
+    ofs << "cor_cutoff" << FSEP << min_jaccard_index << endl;
     ofs.close();
     spdlog::debug("cor cutoff: {}", min_jaccard_index);
 
@@ -1225,7 +1228,8 @@ int D2C::determineBarcodeMerge()
     cmpFile  tbl_out;
     fs::path implicated_barcode_file = output_path / (run_name + IMPLICATED_BARCODES_FILE);
     tbl_out                          = cmpOpen(implicated_barcode_file.c_str());
-    string header                    = "barcode1\tbarcode2\tFragnum_overlap\tFragnum_barcode1\tFragnum_barcode2\tjaccard_distance\tmerged\n";
+    string header =
+        "barcode1\tbarcode2\tFragnum_overlap\tFragnum_barcode1\tFragnum_barcode2\tjaccard_distance\tmerged\n";
     cmpFunc(tbl_out, header.c_str());
     for (size_t i = 0; i < ovdf.size(); ++i)
     {
@@ -1383,11 +1387,11 @@ int D2C::reannotateFragByChr(int chr_id)
     unordered_set< string > pcr_dup;
     unordered_set< int >    qname_dup;
     // Store n_total and n_unique as pair
-    map< string, pair< int, int > >&       merge_ss   = _frag_stats[chr_id];
-    string                                 chr        = _contig_names[chr_id];
-    auto&                                  frags_data = _bedpes_by_chr[chr_id];
-    unordered_map<string, unordered_map<string, int> > dups_per_cell; // only used for saturation
-    unordered_map< int, string >::iterator it;
+    map< string, pair< int, int > >&                      merge_ss   = _frag_stats[chr_id];
+    string                                                chr        = _contig_names[chr_id];
+    auto&                                                 frags_data = _bedpes_by_chr[chr_id];
+    unordered_map< string, unordered_map< string, int > > dups_per_cell;  // only used for saturation
+    unordered_map< int, string >::iterator                it;
     for (auto& bedpe : frags_data)
     {
         // Filter for eligible barcodes
@@ -1499,11 +1503,11 @@ int D2C::finalQC()
 {
     // Load tss file for finding overlaps
     map< string, MyTree > mytrees;
-    vector< Node > nodes;
+    vector< Node >        nodes;
     if (fs::exists(trans_file))
     {
-        ifstream       tss_ifs(trans_file, std::ifstream::in);
-        string         line;
+        ifstream tss_ifs(trans_file, std::ifstream::in);
+        string   line;
         while (std::getline(tss_ifs, line))
         {
             vector< string > vec_s = split_str(line, '\t');
@@ -1579,7 +1583,8 @@ int D2C::finalQC()
     FILE*    qc_out;
     fs::path out_qc_file = output_path / (run_name + QC_STATS_FILE);
     qc_out               = fopen(out_qc_file.c_str(), "w");
-    string header        = "CellBarcode\ttotalFrags\tuniqueFrags\ttotalMitoFrags\tuniqueMitoFrags\tduplicateProportion\tMitoProportion\n";
+    string header =
+        "CellBarcode\ttotalFrags\tuniqueFrags\ttotalMitoFrags\tuniqueMitoFrags\tduplicateProportion\tMitoProportion\n";
     fwrite(header.c_str(), 1, header.size(), qc_out);
     map< string, SummaryData >::iterator it;
     for (auto& l : _sum_stats)
@@ -1590,7 +1595,7 @@ int D2C::finalQC()
 
         string s = l.drop_barcode + FSEP + to_string(l.nuclear_total) + FSEP + to_string(l.nuclear_uniq) + FSEP
                    + to_string(l.mito_total) + FSEP + to_string(l.mito_uniq) + FSEP + f2str(l.dup_proportion, 3) + FSEP
-                   + f2str((l.mito_uniq*1.0)/l.nuclear_uniq, 3) + "\n";
+                   + f2str((l.mito_uniq * 1.0) / l.nuclear_uniq, 3) + "\n";
         fwrite(s.c_str(), 1, s.size(), qc_out);
     }
     fclose(qc_out);
