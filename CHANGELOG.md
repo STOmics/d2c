@@ -1,5 +1,12 @@
 # Change Log
 
+## 1.3.2(2020-10-29)
+
+功能:
+
+* 去除对bam records进行的PROPER_PAIR的检查
+* 增加对barcode无后缀runname的支持
+  
 ## 1.3.1(2020-10-21)
 
 功能:
