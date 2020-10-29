@@ -695,8 +695,8 @@ int D2C::splitBamByChr(int chr_id)
     while (sr->next(bam_record))
     {
         ++pos;
-        if ((bam_record->core.flag & FLAG) != FLAG)
-            continue;
+        // if ((bam_record->core.flag & FLAG) != FLAG)
+        //     continue;
 
         BamRecord b = bam_init1();
         bam_copy1(b, bam_record);
@@ -1685,8 +1685,9 @@ bool D2C::parseRunnameList()
                 if (getTag(bam_record, barcode_tag.c_str(), barcode))
                 {
                     // Barcode format: bc1bc2-runname, and the size of bc1 or bc2 is 10
-                    if (barcode.size() <= BBLEN)
-                        continue;
+                    // There is exists new format without runname, only bc1bc2
+                    if (barcode.size() <= BBLEN) // means no runname
+                        break;
                     string name = barcode.substr(BBLEN);
                     if (!name.empty() && _runname2int.count(name))
                         continue;
@@ -1697,7 +1698,7 @@ bool D2C::parseRunnameList()
                 }
             }
             // Just check one chromosome, it is enough
-            if (_runnames.size() > 1)
+            if (_runnames.size() >= 1)
                 break;
         }
         bam_destroy1(bam_record);
