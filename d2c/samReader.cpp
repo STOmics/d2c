@@ -27,6 +27,7 @@ namespace fs = std::filesystem;
 
 #include "samReader.h"
 #include "timer.h"
+#include "utility.h"
 
 // Class Implementations.
 const int _DEFAULT_HTS_BLOCK_SIZE = 128 * (1024 * 1024);
@@ -74,7 +75,7 @@ std::unique_ptr< SamReader > SamReader::FromFile(const std::string& reads_path)
     // index was loaded.
     const int   threads_num = 4;
     std::string idx_path    = reads_path + ".bai";
-    if (!fs::exists(idx_path))
+    if (!fs::exists(idx_path) || check_file_older(idx_path, reads_path))
     {
         Timer                timer;
         [[maybe_unused]] int ret = sam_index_build3(reads_path.c_str(), idx_path.c_str(), 0, threads_num);

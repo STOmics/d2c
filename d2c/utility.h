@@ -25,3 +25,6 @@ int exec_shell(const char* cmd, std::vector< std::string >& resvec);
 // Get physical memory used by process in real time
 // Only support linux, unit is MB
 size_t physical_memory_used_by_process();
+
+// Return true: first file is older than second file
+bool check_file_older(const std::string& first, const std::string& second);

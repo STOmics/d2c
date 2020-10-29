@@ -141,7 +141,10 @@ def scatterJaccard(filename, threshold, out_prefix):
             i += 1
             if i == 1000000:
                 break
-
+    if len(barcode_counts) == 0:
+        print("No data in ", filename)
+        return
+        
     barcode_counts.sort(reverse=True)
     df = pd.DataFrame(barcode_counts, index=list(range(0,len(barcode_counts))), columns=["cnt"])
     df['PassKnee'] = df["cnt"] > threshold
