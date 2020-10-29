@@ -881,6 +881,12 @@ int D2C::determineHQBeads()
     }
     fclose(out_bead_quant);
 
+    // Check beads size in case program segfault
+    if (_total_bead_quant.empty())
+    {
+        return -1;
+    }
+
     // Calculate bead threshold
     fs::path paras_file = output_path / (run_name + PARAM_FILE);
     ofstream ofs(paras_file.string(), std::ofstream::out);
@@ -1148,6 +1154,12 @@ int D2C::determineBarcodeMerge()
     }
     _total_bead_cnts.clear();
     spdlog::debug("sum_dt size: {}", sum_dt.size());
+
+    // Check beads size in case program segfault
+    if (_total_bead_quant.empty())
+    {
+        return -1;
+    }
 
     // Filter and calculate nBC
     vector< pair< int, int > >       nBC;

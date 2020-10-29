@@ -62,7 +62,7 @@ int Saturation::calculateSaturation(string out_file)
     spdlog::info("Saturation total reads: {}", _nreads);
 
     std::stringstream ss;
-    ss << "#sample_ratio\tmean_frags_per_cell\tsaturation\tmedian_uniq_frags_per_cell\n";
+    ss << "#sample_ratio\tmean_frags_per_cell\tsaturation\tmedian_uniq_frags_per_cell";
 
     std::random_device rd;
     std::mt19937       gen(rd());
@@ -74,7 +74,7 @@ int Saturation::calculateSaturation(string out_file)
     for (size_t i = 1; i < _samples.size(); ++i)
     {
         spdlog::info("Saturation sample:{}", _samples[i]);
-        ss << _samples[i] << "\t";
+        ss <<"\n"<< _samples[i] << "\t";
 
         size_t size = size_t(_samples[i] * _nreads);
         for (; p < size; ++p)
@@ -136,7 +136,7 @@ int Saturation::calculateSaturation(string out_file)
             }
         }
         // spdlog::info("{} {} {}", data.size(), n_reads, n_uniq);
-        ss << n_reads / data.size() << "\t" << 1 - (n_uniq * 1.0 / n_reads) << "\t" << median << std::endl;
+        ss << n_reads / data.size() << "\t" << 1 - (n_uniq * 1.0 / n_reads) << "\t" << median;
     }
 
     std::ofstream ofs(out_file, std::ofstream::out);
