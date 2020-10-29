@@ -177,10 +177,15 @@ def scatterSaturation(filename, out_prefix):
         for line in fh_in:
             if line.startswith('#'): continue
             line = line.strip().split()
+            if len(line) != 4: continue
+
             x.append(line[1])
             y[0].append(line[2])
             y[1].append(line[3])
-            
+    if len(x) <= 1:
+        print("No data in ", filename)
+        return
+        
     fig = make_subplots(rows=1, cols=2,
             subplot_titles=("SequencingSaturation", "MedianUniqueFragmentsPerCell"))
     fig.add_trace(

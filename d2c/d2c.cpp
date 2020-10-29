@@ -1572,6 +1572,20 @@ int D2C::finalQC()
         // TODO(fxzhao): implement this option
     }
 
+    // Summarize frag attributes
+    for (auto& p : summary)
+    {
+        auto& sd = p.second;
+        // sd.mean_insert_size =
+        //     std::accumulate(sd.insert_size.begin(), sd.insert_size.end(), 0.0) / sd.insert_size.size();
+        // std::nth_element(sd.insert_size.begin(), sd.insert_size.begin() + int(0.5 * sd.insert_size.size()),
+        //                  sd.insert_size.end());
+        // sd.median_insert_size = *(sd.insert_size.begin() + int(0.5 * sd.insert_size.size()));
+        // sd.frip               = 0;
+        sd.tss_proportion     = sd.overlaps * 1.0 / sd.insert_size.size();
+    }
+
+
     for (auto& l : _sum_stats)
     {
         int nuclear_total = l.nuclear_total;
@@ -1596,7 +1610,7 @@ int D2C::finalQC()
     fs::path out_qc_file = output_path / (run_name + QC_STATS_FILE);
     qc_out               = fopen(out_qc_file.c_str(), "w");
     string header =
-        "CellBarcode\ttotalFrags\tuniqueFrags\ttotalMitoFrags\tuniqueMitoFrags\tduplicateProportion\tMitoProportion\n";
+        "CellBarcode\ttotalFrags\tuniqueFrags\ttotalMitoFrags\tuniqueMitoFrags\tduplicateProportion\ttssProportion\tMitoProportion\n";
     fwrite(header.c_str(), 1, header.size(), qc_out);
     map< string, SummaryData >::iterator it;
     for (auto& l : _sum_stats)
@@ -1605,9 +1619,10 @@ int D2C::finalQC()
         if (it == summary.end())
             continue;
 
+        auto& sd = it->second;
         string s = l.drop_barcode + FSEP + to_string(l.nuclear_total) + FSEP + to_string(l.nuclear_uniq) + FSEP
-                   + to_string(l.mito_total) + FSEP + to_string(l.mito_uniq) + FSEP + f2str(l.dup_proportion, 3) + FSEP
-                   + f2str((l.mito_uniq * 1.0) / l.nuclear_uniq, 3) + "\n";
+                   + to_string(l.mito_total) + FSEP + to_string(l.mito_uniq) + FSEP + f2str(l.dup_proportion, 4) + FSEP
+                   + f2str(sd.tss_proportion, 4) + FSEP + f2str((l.mito_uniq * 1.0) / l.nuclear_uniq, 4) + "\n";
         fwrite(s.c_str(), 1, s.size(), qc_out);
     }
     fclose(qc_out);
