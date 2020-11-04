@@ -695,8 +695,8 @@ int D2C::splitBamByChr(int chr_id)
     while (sr->next(bam_record))
     {
         ++pos;
-        // if ((bam_record->core.flag & FLAG) != FLAG)
-        //     continue;
+        if ((bam_record->core.flag & FLAG) != FLAG)
+            continue;
 
         BamRecord b = bam_init1();
         bam_copy1(b, bam_record);
