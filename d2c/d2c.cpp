@@ -330,7 +330,7 @@ int D2C::run()
 
 int D2C::taskflow()
 {
-    tf::Executor executor;
+    tf::Executor executor(cores);
     tf::Taskflow taskflow;
 
     taskflow.name("D2C");
@@ -534,7 +534,13 @@ int D2C::taskflow()
                     // Skip the mito chrom
                     if (_contig_names[chr_id] == mito_chr)
                         continue;
-                    _final_frags.insert(_final_frags.end(), _dup_frags[chr_id].begin(), _dup_frags[chr_id].end());
+                    // spdlog::debug("final frags size: {} dup frags size: {} {}", _final_frags.size(), chr_id, _dup_frags[chr_id].size());
+                    // _final_frags.insert(_final_frags.end(), _dup_frags[chr_id].begin(), _dup_frags[chr_id].end());
+                    for (auto& frag : _dup_frags[chr_id])
+                    {
+                        // spdlog::debug("frag: {} {} {} {}", frag.start, frag.end, frag.chr_id, frag.barcode_id);
+                        _final_frags.push_back(std::move(frag));
+                    }
                     _dup_frags[chr_id].clear();
                     _dup_frags[chr_id].shrink_to_fit();
                 }
@@ -547,7 +553,7 @@ int D2C::taskflow()
                 for (auto& l : _final_frags)
                 {
                     // Standardized format output, insert one column data
-                    string s = l + "\t1\n";
+                    string s = _contig_names[l.chr_id] + "\t" + to_string(l.start) + "\t" + to_string(l.end) + "\t" + _idx2drop[l.barcode_id] + "\t1\n";
                     // spdlog::debug(s);
                     [[maybe_unused]] auto ret = bgzf_write(out_frag, s.c_str(), s.size());
                 }
@@ -1236,6 +1242,8 @@ int D2C::determineBarcodeMerge()
     ofs.close();
     spdlog::debug("cor cutoff: {}", min_jaccard_index);
 
+    spdlog::debug("determineBarcodeMerge memory(MB): {}", physical_memory_used_by_process());
+
     // Export the implicated barcodes
     cmpFile  tbl_out;
     fs::path implicated_barcode_file = output_path / (run_name + IMPLICATED_BARCODES_FILE);
@@ -1289,6 +1297,7 @@ int D2C::determineBarcodeMerge()
         bar2pos[nBC[i].first] = i;
     }
 
+    spdlog::debug("before barcode combine memory(MB): {}", physical_memory_used_by_process());
     // Devel
     // for (size_t i = 0; i < nBC.size(); ++i)
     // {
@@ -1334,19 +1343,24 @@ int D2C::determineBarcodeMerge()
                     drop_barcode = run_name + ss.str();
                 else
                     drop_barcode = run_name + "_Tn5-" + substrRight(int2Barcode(b)) + ss.str();
-                _drop_barcodes[b]     = drop_barcode;
+                
+                if (_idx2drop.empty() || drop_barcode != _idx2drop.back())
+                    _idx2drop.push_back(std::move(drop_barcode));
+                _drop_barcodes[b]     = _idx2drop.size() - 1;
                 nBC[bar2pos[b]].first = -1;
             }
         }
         ++idx;
     }
 
+    spdlog::debug("after barcode combine memory(MB): {}", physical_memory_used_by_process());
+
     FILE*    bt;
     fs::path barcode_translate_file = output_path / (run_name + BARCODE_TRANSLATE_FILE);
     bt                              = fopen(barcode_translate_file.c_str(), "w");
     for (auto& p : _drop_barcodes)
     {
-        string s = int2Barcode(p.first) + int2Runname(p.first) + "\t" + p.second + "\n";
+        string s = int2Barcode(p.first) + int2Runname(p.first) + "\t" + _idx2drop[p.second] + "\n";
         fwrite(s.c_str(), 1, s.size(), bt);
     }
     fclose(bt);
@@ -1388,22 +1402,22 @@ inline int start(const string& s)
 
 struct cmp
 {
-    bool operator()(const string& a, const string& b) const
+    bool operator()(const AnnotateFragment& a, const AnnotateFragment& b) const
     {
-        return start(a) < start(b);
+        return a.start < b.start;
     }
 };
 
 int D2C::reannotateFragByChr(int chr_id)
 {
-    unordered_set< string > pcr_dup;
+    spp::sparse_hash_set< AnnotateFragment > pcr_dup;
     unordered_set< int >    qname_dup;
     // Store n_total and n_unique as pair
     map< string, pair< int, int > >&                      merge_ss   = _frag_stats[chr_id];
     string                                                chr        = _contig_names[chr_id];
     auto&                                                 frags_data = _bedpes_by_chr[chr_id];
-    unordered_map< string, unordered_map< string, int > > dups_per_cell;  // only used for saturation
-    unordered_map< int, string >::iterator                it;
+    unordered_map< string, spp::sparse_hash_map< AnnotateFragment, int > > dups_per_cell;  // only used for saturation
+    unordered_map< int, int >::iterator                it;
     for (auto& bedpe : frags_data)
     {
         // Filter for eligible barcodes
@@ -1412,12 +1426,14 @@ int D2C::reannotateFragByChr(int chr_id)
         if (it == _drop_barcodes.end())
             continue;
 
-        string cell_barcode = it->second;
-        string s            = chr + "\t" + to_string(bedpe.start) + "\t" + to_string(bedpe.end) + "\t" + cell_barcode;
+        string cell_barcode = _idx2drop[it->second];
+        // string s            = chr + "\t" + to_string(bedpe.start) + "\t" + to_string(bedpe.end) + "\t" + cell_barcode;
+        AnnotateFragment frag(chr_id, bedpe.start, bedpe.end, it->second);
         auto&  p            = merge_ss[cell_barcode];
-        if (pcr_dup.count(s) == 0)
+        if (pcr_dup.count(frag) == 0)
         {
-            pcr_dup.insert(s);
+            // spdlog::debug("frag1: {} {} {} {}", frag.start, frag.end, frag.chr_id, frag.barcode_id);
+            pcr_dup.insert(frag);
             // qname_dup.insert(bedpe.qname);
             qname_dup.insert(bedpe.qname1);
             qname_dup.insert(bedpe.qname2);
@@ -1427,14 +1443,19 @@ int D2C::reannotateFragByChr(int chr_id)
 
         if (saturation_on)
         {
-            dups_per_cell[cell_barcode][s]++;
+            dups_per_cell[cell_barcode][frag]++;
         }
     }
     qname_dup.swap(_keep_qnames[chr_id]);
 
     // Sort by start
-    vector< string > dup_keys(pcr_dup.begin(), pcr_dup.end());
+    vector< AnnotateFragment > dup_keys(pcr_dup.begin(), pcr_dup.end());
+    // spdlog::debug("dup keys size: {} pcr_dup size: {}", dup_keys.size(), pcr_dup.size());
     std::sort(dup_keys.begin(), dup_keys.end(), cmp());
+    // for (auto& frag : dup_keys)
+    // {
+    //     spdlog::debug("frag1: {} {} {} {}", frag.start, frag.end, frag.chr_id, frag.barcode_id);
+    // }
     dup_keys.swap(_dup_frags[chr_id]);
 
     // Release the memory
@@ -1470,7 +1491,7 @@ int D2C::annotateBamByChr(int chr_id)
 
     BamRecord                              b = bam_init1();
     string                                 bead_bc, drop_bc;
-    unordered_map< int, string >::iterator it;
+    unordered_map< int, int >::iterator it;
     // Iterate through bam
     int line = -1;
     while (sr->next(b))
@@ -1498,7 +1519,7 @@ int D2C::annotateBamByChr(int chr_id)
         it          = _drop_barcodes.find(barcode);
         if (it == _drop_barcodes.end())
             continue;
-        drop_bc = it->second;
+        drop_bc = _idx2drop[it->second];
 
         // Handle droplet barcodes that we want to consider writing out
         bam_aux_append(b, drop_tag.c_str(), 'Z', drop_bc.size() + 1, ( uint8_t* )drop_bc.c_str());
@@ -1543,15 +1564,11 @@ int D2C::finalQC()
     map< string, SummaryData > summary;
     for (auto& l : _final_frags)
     {
-        vector< string > vec_s = split_str(l, '\t');
-        if (vec_s.size() < 4)
-            continue;
-
-        string     chr   = vec_s[0];
-        int        start = stoi(vec_s[1]);
-        int        end   = stoi(vec_s[2]);
+        string     chr   = _contig_names[l.chr_id];
+        int        start = l.start;
+        int        end   = l.end;
         MyInterval query_range{ start, end };
-        auto&      sd = summary[vec_s[3]];
+        auto&      sd = summary[_idx2drop[l.barcode_id]];
         if (mytrees.count(chr) != 0)
         {
             const auto& tree = mytrees.at(chr);

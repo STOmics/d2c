@@ -101,10 +101,10 @@ private:
     unordered_set< int >                      _hq_beads;
     vector< map< int, int > >                 _total_nc_cnts;
     vector< unordered_map< size_t, int > >    _total_bead_cnts;
-    unordered_map< int, string >              _drop_barcodes;
+    unordered_map< int, int >              _drop_barcodes;
     vector< string >                          _contig_names;
-    vector< vector< string > >                _dup_frags;
-    vector< string >                          _final_frags;
+    vector< vector< AnnotateFragment > >                _dup_frags;
+    vector< AnnotateFragment >                          _final_frags;
     vector< unordered_set< int > >            _keep_qnames;
     vector< map< string, pair< int, int > > > _frag_stats;
     vector< SumStat >                         _sum_stats;
@@ -120,4 +120,7 @@ private:
     // Note: runnames starts with '-', and the string in first position is empty string
     vector< string >             _runnames;
     unordered_map< string, int > _runname2int;
+
+    // Index to drop barcodes, encoding barcodes to int
+    vector<string> _idx2drop;
 };

@@ -70,8 +70,8 @@ int main(int argc, char** argv)
     sub_count->add_option("-b", barcode_list, "Barcode list file")->check(CLI::ExistingFile);
     int mapq = 30;
     sub_count->add_option("--mapq", mapq, "Filter thrshold of mapping quality, default 30");
-    int cores = 0;
-    sub_count->add_option("-c", cores, "CPU core number, default detect");
+    int cores = std::thread::hardware_concurrency();
+    sub_count->add_option("-c", cores, "CPU core number, default detect")->check(CLI::PositiveNumber);
     bool tn5 = false;
     sub_count->add_flag("--tn5", tn5, "Process data knowing that the barcodes were generated with a barcoded Tn5");
     double min_barcode_frags = 0.0;
@@ -156,8 +156,6 @@ int main(int argc, char** argv)
     if (sub_count->parsed())
     {
         // Make sure the parameters are valid
-        if (cores <= 0)
-            cores = std::thread::hardware_concurrency();
         fs::path      ref_path = exe_path / "anno";
         set< string > supported_genomes;
         for (auto& p : fs::directory_iterator(ref_path / "bedtools"))

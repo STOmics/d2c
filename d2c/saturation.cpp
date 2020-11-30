@@ -33,7 +33,7 @@ Saturation::Saturation()
 
 Saturation::~Saturation() {}
 
-int Saturation::addData(unordered_map< string, unordered_map< string, int > >& dups_per_cell)
+int Saturation::addData(unordered_map< string, spp::sparse_hash_map< AnnotateFragment, int > >& dups_per_cell)
 {
     for (auto& [barcode, frags] : dups_per_cell)
     {

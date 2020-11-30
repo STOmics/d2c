@@ -16,6 +16,8 @@
 #include <vector>
 using namespace std;
 
+#include <sparsepp/spp.h>
+
 #include "types.h"
 
 struct FragData
@@ -33,7 +35,7 @@ public:
     ~Saturation();
 
     // Parse raw data to vectors
-    int addData(unordered_map< string, unordered_map< string, int > >& dups_per_cell);
+    int addData(unordered_map< string, spp::sparse_hash_map< AnnotateFragment, int > >& dups_per_cell);
 
     // Calculate sequencing saturation
     int calculateSaturation(string out_file);
