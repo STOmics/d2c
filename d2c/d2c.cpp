@@ -613,6 +613,20 @@ int D2C::taskflow()
                                      _sum_stats.push_back(ss);
                                  }
                              }
+                             else
+                             {
+                                // Stay useful infomation except mito
+                                for (auto& [cell_barcode, count_pair] : nuclear)
+                                {
+                                    SumStat ss;
+                                    ss.drop_barcode = cell_barcode;
+                                    ss.nuclear_total = count_pair.first;
+                                    ss.nuclear_uniq = count_pair.second;
+                                    ss.mito_total = 0;
+                                    ss.mito_uniq = 0;
+                                    _sum_stats.push_back(ss);
+                                }
+                             }
                              // fs::path out_ss_file = output_path / (run_name + BASIC_QC_FILE);
                              // FILE*    out_ss;
                              // out_ss = fopen(out_ss_file.c_str(), "w");
