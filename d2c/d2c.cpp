@@ -761,12 +761,11 @@ int D2C::splitBamByChr(int chr_id)
     // }
 
     // Load blacklist file and construct interval tree
-    MyTree mytree;
+    vector< Node > nodes;
+    string         line;
     if (fs::exists(blacklist_file))
     {
         ifstream       blf(blacklist_file, std::ifstream::in);
-        vector< Node > nodes;
-        string         line;
         while (std::getline(blf, line))
         {
             vector< string > vec_str = split_str(line, '\t');
@@ -784,11 +783,11 @@ int D2C::splitBamByChr(int chr_id)
             nodes.push_back(std::move(node));
         }
         blf.close();
-
-        for (auto& node : nodes)
-        {
-            mytree.insert(node);
-        }
+    }
+    MyTree mytree;
+    for (auto& node : nodes)
+    {
+        mytree.insert(node);
     }
     // set< UniqBarcode > pcr_dup;
     spp::sparse_hash_set< UniqBarcode > pcr_dup;
