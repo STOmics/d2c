@@ -2,7 +2,7 @@
 # TODO: change the libPath to your specific path
 libPath="/hwfssz5/ST_BIGDATA/USER/zhaofuxiang/lib"
 
-cmakePath="/hwfssz1/ST_BIGDATA/USER/liuxing2/software/source/cmake-3.13.1-Linux-x86_64"
+cmakePath="$libPath/cmake-3.17.2"
 gccPath="$libPath/gcc-9.1.0"
 CLI11Path="$libPath/CLI11-1.9.0"
 spdlogPath="$libPath/spdlog-1.5.0"
@@ -21,9 +21,9 @@ export PATH="$gccPath/bin:$cmakePath/bin:$binPath"
 
 export LD_LIBRARY_PATH="$fftwPath/lib:$LD_LIBRARY_PATH"
 export LD_LIBRARY_PATH="$libdeflatePath/lib:$htslibPath/lib:$gccPath/lib64:$LD_LIBRARY_PATH"
-export LD_LIBRARY_PATH="/lib64:$LD_LIBRARY_PATH"
+export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/lib64"
 export LIBRARY_PATH=$LD_LIBRARY_PATH
-#echo $LD_LIBRARY_PATH
+# echo $LD_LIBRARY_PATH
 
 export C_INCLUDE_PATH="$sparseppPath/include:$C_INCLUDE_PATH"
 export C_INCLUDE_PATH="$fftwPath/include:$C_INCLUDE_PATH"

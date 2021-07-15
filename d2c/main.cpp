@@ -23,8 +23,10 @@ using namespace std;
 namespace fs = std::filesystem;
 
 #include <CLI11.hpp>
-#include <spdlog/sinks/basic_file_sink.h>
+
 #include <spdlog/spdlog.h>
+#include <spdlog/sinks/basic_file_sink.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 
 #include "timer.h"
 
@@ -126,11 +128,11 @@ int main(int argc, char** argv)
         // auto file_logger = spdlog::basic_logger_mt("main", "logs/" + ostr.str());
         fs::path fs_log_path(log_path);
         auto     file_sink      = std::make_shared< spdlog::sinks::basic_file_sink_mt >(fs_log_path / ostr.str());
-        auto     main_logger    = std::make_shared< spdlog::logger >("main", file_sink);
-        auto     process_logger = std::make_shared< spdlog::logger >("process", file_sink);
-        spdlog::register_logger(main_logger);
-        spdlog::register_logger(process_logger);
-        spdlog::set_default_logger(process_logger);
+        auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+        std::vector<spdlog::sink_ptr> sinks {console_sink, file_sink};
+        auto logger = std::make_shared<spdlog::logger>("d2c", sinks.begin(), sinks.end());
+        spdlog::register_logger(logger);
+        spdlog::set_default_logger(logger);
     }
     catch (const spdlog::spdlog_ex& ex)
     {
@@ -170,12 +172,12 @@ int main(int argc, char** argv)
         // Check jaccard index is valid
         if (min_jaccard_index > 1 || min_jaccard_index < 0)
         {
-            cout << "User specified jaccard index > 1 or < 0:" << min_jaccard_index << endl;
+            spdlog::info("User specified jaccard index > 1 or < 0: {}", min_jaccard_index);
         }
         // Handle reference genome
         if (supported_genomes.count(ref) != 0)
         {
-            cout << "Found designated reference genome:" << ref << endl;
+            spdlog::info("Found designated reference genome: {}",ref);
             if (trans_file.empty())
                 trans_file = ref_path / "TSS" / (ref + ".refGene.TSS.bed");
             if (blacklist_file.empty())
@@ -227,7 +229,7 @@ int main(int argc, char** argv)
         if (mix_species.count(ref) != 0)
             species_mix = true;
 
-        spdlog::get("main")->info("{} input_bam:{} output_path:{} barcode_in_tag:{} barcode_out_tag:{} "
+        spdlog::info("{} input_bam:{} output_path:{} barcode_in_tag:{} barcode_out_tag:{} "
                                   "mapq:{} cores:{} run_name:{} tn5:{} min_barcode_frags:{} min_jaccard_index:{} "
                                   "ref:{} mito_chr:{} bed_genome_file:{} blacklist_file:{} trans_file:{} "
                                   "species_mix:{} barcode_threshold:{} jaccard_threshold:{} saturation_on:{} "
@@ -256,7 +258,7 @@ int main(int argc, char** argv)
     }
     else if (sub_reanno->parsed())
     {
-        spdlog::get("main")->info(
+        spdlog::info(
             "{} input_bam:{} output_path:{} barcode_in_tag:{} barcode_out_tag:{} runname:{} barcode_translate_file:{}",
             argv[0], input_bam, output_path, barcode_in_tag, barcode_out_tag, run_name, barcode_translate_file);
         fs::path output_bam(output_path);
@@ -264,7 +266,7 @@ int main(int argc, char** argv)
         output_bam /= run_name + "_transid.bam";
         bool ret = reannotate(input_bam, barcode_translate_file, output_bam.string(), barcode_in_tag, barcode_out_tag);
         if (!ret)
-            spdlog::get("main")->error("Transform failed!");
+            spdlog::error("Transform failed!");
     }
     else
     {
@@ -272,8 +274,8 @@ int main(int argc, char** argv)
         return -1;
     }
 
-    cout << "Finish process." << endl;
-    spdlog::get("main")->info("{} process done. Elapsed time(s):{:.2f}", APP_NAME, timer.toc(1000));
+    // cout << "Finish process." << endl;
+    spdlog::info("{} process done. Elapsed time(s):{:.2f}", APP_NAME, timer.toc(1000));
 
     return 0;
 }
