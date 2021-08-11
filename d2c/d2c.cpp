@@ -340,7 +340,11 @@ int D2C::taskflow()
     std::vector< std::pair< std::string, unsigned int > > contigs   = samReader->getContigs();
     spdlog::debug("Bam contigs num: {}", contigs.size());
     for (auto& p : contigs)
+    {
         _contig_names.push_back(p.first);
+        spdlog::debug("bam contig: {}", p.first);
+
+    }
 
     // Verify that the supplied reference genome and the bam have overlapping chromosomes
     auto bed_chrs = parseChrsFromBedFile();
@@ -350,6 +354,8 @@ int D2C::taskflow()
             bed_chrs.emplace(ctg, "");
     }
     spdlog::debug("bed_chrs num: {}", bed_chrs.size());
+    for (auto& [contig,_] : bed_chrs) 
+        spdlog::debug("bed contig: {}", contig);
 
     vector< int > used_chrs;
     for (size_t i = 0; i < contigs.size(); ++i)

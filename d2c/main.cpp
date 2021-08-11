@@ -32,7 +32,7 @@ namespace fs = std::filesystem;
 
 //#define DEVEL
 constexpr auto APP_NAME    = "D2C";
-constexpr auto APP_VERSION = "1.3.7";
+constexpr auto APP_VERSION = "1.3.8";
 
 int main(int argc, char** argv)
 {
@@ -138,8 +138,8 @@ int main(int argc, char** argv)
     {
         std::cout << "Log init failed: " << ex.what() << std::endl;
     }
-    spdlog::set_level(spdlog::level::info);  // Set global log level.
-    spdlog::flush_on(spdlog::level::info);
+    spdlog::set_level(spdlog::level::debug);  // Set global log level.
+    spdlog::flush_on(spdlog::level::debug);
     spdlog::set_pattern("%Y-%m-%d %H:%M:%S.%e %L %n: %v");
 
     // Get runname from the prefix of input bam if it is empty
