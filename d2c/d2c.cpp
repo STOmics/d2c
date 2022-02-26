@@ -286,6 +286,11 @@ D2C::D2C(string input_bam, string output_path, string barcode_in_tag, string bar
     nc_threshold         = 6;
     regularize_threshold = 4;
     one_to_one           = false;
+
+    if (fs::path(input_bam).extension() == ".bed")
+        _is_bed = true;
+    else
+        _is_bed = false;
 }
 
 int D2C::run()
@@ -336,8 +341,18 @@ int D2C::taskflow()
     taskflow.name("D2C");
 
     // Step 1: split bam by chr
-    auto                                                  samReader = SamReader::FromFile(input_bam);
-    std::vector< std::pair< std::string, unsigned int > > contigs   = samReader->getContigs();
+    std::vector< std::pair< std::string, unsigned int > > contigs;
+    if (_is_bed)
+    {
+        auto temp_map = parseChrsFromBedFile(input_bam);
+        for (auto& [k,_] : temp_map)
+            contigs.push_back({k, 0});
+    }
+    else
+    {
+        auto samReader = SamReader::FromFile(input_bam);
+        contigs   = samReader->getContigs();
+    }
     spdlog::debug("Bam contigs num: {}", contigs.size());
     for (auto& p : contigs)
     {
@@ -347,7 +362,7 @@ int D2C::taskflow()
     }
 
     // Verify that the supplied reference genome and the bam have overlapping chromosomes
-    auto bed_chrs = parseChrsFromBedFile();
+    auto bed_chrs = parseChrsFromBedFile(bed_genome_file);
     if (bed_chrs.empty())
     {
         for (auto& ctg : _contig_names)
@@ -467,6 +482,9 @@ int D2C::taskflow()
         // Skip the mito chrom
         if (_contig_names[chr_id] == mito_chr)
             return;
+        if (_is_bed)
+            return;
+
         Timer t;
         D2C::annotateBamByChr(chr_id);
         spdlog::info("Annotate bam file by chr: {} time(s): {:.2f}", _contig_names[chr_id], t.toc(1000));
@@ -707,45 +725,87 @@ bool operator<(const UniqBarcode& lhs, const UniqBarcode& rhs)
 
 int D2C::splitBamByChr(int chr_id)
 {
-    std::unique_ptr< SamReader > sr = SamReader::FromFile(input_bam);
-    if (!sr->QueryByContig(chr_id))
-        return 0;
-    spdlog::debug("Call splitBamByChr: {}", _contig_names[chr_id]);
     string chr_str = _contig_names[chr_id];
+    spdlog::debug("Call splitBamByChr: {}", chr_str);
 
-    map< string, pair< BamRecord, int > >           pe_dict;
-    map< string, pair< BamRecord, int > >::iterator it;
-    auto&                                           bedpes     = _bedpes_by_chr[chr_id];
-    BamRecord                                       bam_record = bam_init1();
-    int                                             pos        = -1;
-    while (sr->next(bam_record))
+    auto& bedpes = _bedpes_by_chr[chr_id];
+
+    if (_is_bed)
     {
-        ++pos;
-        if ((bam_record->core.flag & FLAG) != FLAG)
-            continue;
+        ifstream ifs(input_bam, std::ifstream::in);
+        string   line;
+        while (std::getline(ifs, line))
+        {
+            vector< string > vec_s = split_str(line, '\t');
+            if (vec_s.size() < 4 || vec_s[0] != chr_str)
+                continue;
+            
+            Bedpe bedpe;
+            bedpe.start = stoi(vec_s[1]);
+            bedpe.end   = stoi(vec_s[2]);
+            bedpe.qname1 = 0;
+            bedpe.qname2 = 0;
 
-        BamRecord b = bam_init1();
-        bam_copy1(b, bam_record);
-        string qname = getQname(b);
-        it           = pe_dict.find(qname);
-        if (it == pe_dict.end())
-        {
-            pe_dict[qname] = { b, pos };
+            string& barcode = vec_s[3];
+            string b1 = barcode.substr(0, BLEN);
+            string b2 = barcode.substr(BLEN, BLEN);
+            if (_barcode2int.count(b1) == 0 || _barcode2int.count(b2) == 0)
+            {
+                spdlog::warn("Invalid barcode {} not exists in barcode list", barcode);
+                continue;
+            }
+            int runname = 0;
+            if (barcode.size() > BBLEN)
+            {
+                string tmp = barcode.substr(BBLEN);
+                runname    = _runname2int[tmp];
+            }
+            bedpe.barcode = (runname << BBIT * 2) + (_barcode2int[b1] << BBIT) + _barcode2int[b2];
+
+            bedpes.push_back(bedpe);
         }
-        else
-        {
-            extractBedPE(it->second.first, b, bedpes, it->second.second, pos);
-            bam_destroy1(it->second.first);
-            pe_dict.erase(it);
-            bam_destroy1(b);
-        }
+        ifs.close();
     }
-    bam_destroy1(bam_record);
-    for (auto& p : pe_dict)
-        bam_destroy1(p.second.first);
-    pe_dict.clear();
-    spdlog::debug("chr: {} frags size: {}", _contig_names[chr_id], bedpes.size());
-    spdlog::debug("chr: {} memory(MB): {}", _contig_names[chr_id], physical_memory_used_by_process());
+    else
+    {
+        std::unique_ptr< SamReader > sr = SamReader::FromFile(input_bam);
+        if (!sr->QueryByContig(chr_id))
+            return 0;
+
+        map< string, pair< BamRecord, int > >           pe_dict;
+        map< string, pair< BamRecord, int > >::iterator it;
+        BamRecord                                       bam_record = bam_init1();
+        int                                             pos        = -1;
+        while (sr->next(bam_record))
+        {
+            ++pos;
+            if ((bam_record->core.flag & FLAG) != FLAG)
+                continue;
+
+            BamRecord b = bam_init1();
+            bam_copy1(b, bam_record);
+            string qname = getQname(b);
+            it           = pe_dict.find(qname);
+            if (it == pe_dict.end())
+            {
+                pe_dict[qname] = { b, pos };
+            }
+            else
+            {
+                extractBedPE(it->second.first, b, bedpes, it->second.second, pos);
+                bam_destroy1(it->second.first);
+                pe_dict.erase(it);
+                bam_destroy1(b);
+            }
+        }
+        bam_destroy1(bam_record);
+        for (auto& p : pe_dict)
+            bam_destroy1(p.second.first);
+        pe_dict.clear();
+    }
+
+    spdlog::debug("chr: {} frags size: {}", chr_str, bedpes.size());
+    spdlog::debug("chr: {} memory(MB): {}", chr_str, physical_memory_used_by_process());
 
     // Devel
     // if (chr_str == "chrX")
@@ -855,18 +915,18 @@ int D2C::splitBamByChr(int chr_id)
     return 0;
 }
 
-map< string, string > D2C::parseChrsFromBedFile()
+map< string, string > D2C::parseChrsFromBedFile(string filename)
 {
     map< string, string > chrs;
-    if (!fs::exists(bed_genome_file))
+    if (!fs::exists(filename))
         return chrs;
 
-    ifstream ifs(bed_genome_file, std::ifstream::in);
+    ifstream ifs(filename, std::ifstream::in);
     string   line;
     while (std::getline(ifs, line))
     {
         vector< string > vec_s = split_str(line, '\t');
-        if (vec_s.size() != 2)
+        if (vec_s.size() < 2)
             continue;
         chrs[vec_s[0]] = vec_s[1];
     }
@@ -1734,37 +1794,63 @@ bool D2C::parseRunnameList()
     else
     {
         // Get run names from bam file
-        std::unique_ptr< SamReader >                          sr      = SamReader::FromFile(input_bam);
-        std::vector< std::pair< std::string, unsigned int > > contigs = sr->getContigs();
-
-        BamRecord bam_record = bam_init1();
-        string    barcode("NA");
-        for (size_t chr_id = 0; chr_id < contigs.size(); ++chr_id)
+        if (_is_bed)
         {
-            if (!sr->QueryByContig(chr_id))
-                continue;
-            while (sr->next(bam_record))
+            ifstream ifs(input_bam, std::ifstream::in);
+            string   line;
+            while (std::getline(ifs, line))
             {
-                if (getTag(bam_record, barcode_tag.c_str(), barcode))
-                {
-                    // Barcode format: bc1bc2-runname, and the size of bc1 or bc2 is 10
-                    // There is exists new format without runname, only bc1bc2
-                    if (barcode.size() <= BBLEN) // means no runname
-                        break;
-                    string name = barcode.substr(BBLEN);
-                    if (!name.empty() && _runname2int.count(name))
-                        continue;
-                    _runnames.push_back(name);
-                    _runname2int[name] = pos++;
-                    // Users insist on not mixing multiple batches of data, so we just read one record in bam
+                vector< string > vec_s = split_str(line, '\t');
+                if (vec_s.size() < 4)
+                    continue;
+                
+                string& barcode = vec_s[3];
+                if (barcode.size() <= BBLEN)
                     break;
-                }
-            }
-            // Just check one chromosome, it is enough
-            if (_runnames.size() >= 1)
+
+                string name = barcode.substr(BBLEN);
+                if (!name.empty() && _runname2int.count(name))
+                    continue;
+                _runnames.push_back(name);
+                _runname2int[name] = pos++;
                 break;
+            }
+            ifs.close();
         }
-        bam_destroy1(bam_record);
+        else
+        {
+            std::unique_ptr< SamReader >                          sr      = SamReader::FromFile(input_bam);
+            std::vector< std::pair< std::string, unsigned int > > contigs = sr->getContigs();
+
+            BamRecord bam_record = bam_init1();
+            string    barcode("NA");
+            for (size_t chr_id = 0; chr_id < contigs.size(); ++chr_id)
+            {
+                if (!sr->QueryByContig(chr_id))
+                    continue;
+                while (sr->next(bam_record))
+                {
+                    if (getTag(bam_record, barcode_tag.c_str(), barcode))
+                    {
+                        // Barcode format: bc1bc2-runname, and the size of bc1 or bc2 is 10
+                        // There is exists new format without runname, only bc1bc2
+                        if (barcode.size() <= BBLEN) // means no runname
+                            break;
+                        string name = barcode.substr(BBLEN);
+                        if (!name.empty() && _runname2int.count(name))
+                            continue;
+                        _runnames.push_back(name);
+                        _runname2int[name] = pos++;
+                        // Users insist on not mixing multiple batches of data, so we just read one record in bam
+                        break;
+                    }
+                }
+                // Just check one chromosome, it is enough
+                if (_runnames.size() >= 1)
+                    break;
+            }
+            bam_destroy1(bam_record);
+        }
     }
     spdlog::debug("Barcode runname number: {}", _runnames.size() - 1);
     return true;

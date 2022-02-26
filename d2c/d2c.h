@@ -49,7 +49,7 @@ public:
     int splitBamByChr(int chr_id);
 
 private:
-    map< string, string > parseChrsFromBedFile();
+    map< string, string > parseChrsFromBedFile(string filename);
     void                  extractBedPE(const BamRecord b1, const BamRecord b2, vector< Bedpe >& bedpes, int l1, int l2);
     int                   determineHQBeads();
     pair< double, double > parseBeadThreshold(string filename);
@@ -123,4 +123,7 @@ private:
 
     // Index to drop barcodes, encoding barcodes to int
     vector<string> _idx2drop;
+
+    // Check input file type
+    bool _is_bed;
 };

@@ -55,7 +55,7 @@ int main(int argc, char** argv)
 
     // Required parameters
     string input_bam, output_path;
-    app.add_option("-i", input_bam, "Input bam filename")->check(CLI::ExistingFile)->required();
+    app.add_option("-i", input_bam, "Input bam or bed filename")->check(CLI::ExistingFile)->required();
     app.add_option("-o", output_path, "Output result path")->required();
 
     // Optional parameters
