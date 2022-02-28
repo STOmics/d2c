@@ -391,6 +391,49 @@ int D2C::taskflow()
 
     spdlog::debug("Initial memory(MB): {}", physical_memory_used_by_process());
     _bedpes_by_chr.resize(contigs.size());
+    if (_is_bed)
+    {
+        map<string, int> chr_to_int;
+        for (auto& id : used_chrs)
+            chr_to_int[_contig_names[id]] = id;
+
+        // Parse data for bed file
+        ifstream ifs(input_bam, std::ifstream::in);
+        string   line;
+        while (std::getline(ifs, line))
+        {
+            vector< string > vec_s = split_str(line, '\t');
+            if (vec_s.size() < 4)
+                continue;
+            if (chr_to_int.count(vec_s[0]) == 0)
+                continue;
+            string& barcode = vec_s[3];
+            string b1 = barcode.substr(0, BLEN);
+            string b2 = barcode.substr(BLEN, BLEN);
+            if (_barcode2int.count(b1) == 0 || _barcode2int.count(b2) == 0)
+            {
+                spdlog::warn("Invalid barcode {} not exists in barcode list", barcode);
+                continue;
+            }
+
+            Bedpe bedpe;
+            bedpe.start = stoi(vec_s[1]);
+            bedpe.end   = stoi(vec_s[2]);
+            bedpe.qname1 = 0;
+            bedpe.qname2 = 0;
+
+            int runname = 0;
+            if (barcode.size() > BBLEN)
+            {
+                string tmp = barcode.substr(BBLEN);
+                runname    = _runname2int[tmp];
+            }
+            bedpe.barcode = (runname << BBIT * 2) + (_barcode2int[b1] << BBIT) + _barcode2int[b2];
+
+            _bedpes_by_chr[chr_to_int[vec_s[0]]].push_back(bedpe);
+        }
+        ifs.close();
+    }
     auto [S, T] = taskflow.parallel_for(used_chrs.begin(), used_chrs.end(), [&](int chr_id) {
         Timer t;
         D2C::splitBamByChr(chr_id);
@@ -422,8 +465,8 @@ int D2C::taskflow()
     //         cout<<"has data chr: "<<i<<endl;
     auto [start_cal, end_cal] = taskflow.parallel_for(used_chrs.begin(), used_chrs.end(), [&](int chr_id) {
         // Skip the mito chrom
-        //if (_contig_names[chr_id] == mito_chr)
-        //    return;
+        if (_contig_names[chr_id] == mito_chr)
+            return;
         Timer t;
         D2C::computeStatByChr(chr_id);
         spdlog::info("Compute stat by chr: {} time(s): {:.2f}", _contig_names[chr_id], t.toc(1000));
@@ -732,44 +775,7 @@ int D2C::splitBamByChr(int chr_id)
     spdlog::debug("Call splitBamByChr: {}", chr_str);
 
     auto& bedpes = _bedpes_by_chr[chr_id];
-
-    if (_is_bed)
-    {
-        ifstream ifs(input_bam, std::ifstream::in);
-        string   line;
-        while (std::getline(ifs, line))
-        {
-            vector< string > vec_s = split_str(line, '\t');
-            if (vec_s.size() < 4 || vec_s[0] != chr_str)
-                continue;
-            
-            Bedpe bedpe;
-            bedpe.start = stoi(vec_s[1]);
-            bedpe.end   = stoi(vec_s[2]);
-            bedpe.qname1 = 0;
-            bedpe.qname2 = 0;
-
-            string& barcode = vec_s[3];
-            string b1 = barcode.substr(0, BLEN);
-            string b2 = barcode.substr(BLEN, BLEN);
-            if (_barcode2int.count(b1) == 0 || _barcode2int.count(b2) == 0)
-            {
-                spdlog::warn("Invalid barcode {} not exists in barcode list", barcode);
-                continue;
-            }
-            int runname = 0;
-            if (barcode.size() > BBLEN)
-            {
-                string tmp = barcode.substr(BBLEN);
-                runname    = _runname2int[tmp];
-            }
-            bedpe.barcode = (runname << BBIT * 2) + (_barcode2int[b1] << BBIT) + _barcode2int[b2];
-
-            bedpes.push_back(bedpe);
-        }
-        ifs.close();
-    }
-    else
+    if (!_is_bed)
     {
         std::unique_ptr< SamReader > sr = SamReader::FromFile(input_bam);
         if (!sr->QueryByContig(chr_id))
