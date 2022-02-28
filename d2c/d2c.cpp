@@ -422,8 +422,8 @@ int D2C::taskflow()
     //         cout<<"has data chr: "<<i<<endl;
     auto [start_cal, end_cal] = taskflow.parallel_for(used_chrs.begin(), used_chrs.end(), [&](int chr_id) {
         // Skip the mito chrom
-        if (_contig_names[chr_id] == mito_chr)
-            return;
+        //if (_contig_names[chr_id] == mito_chr)
+        //    return;
         Timer t;
         D2C::computeStatByChr(chr_id);
         spdlog::info("Compute stat by chr: {} time(s): {:.2f}", _contig_names[chr_id], t.toc(1000));
@@ -480,8 +480,8 @@ int D2C::taskflow()
     // Step 6: annotate bam file by chr
     auto [start_annobam, end_annobam] = taskflow.parallel_for(used_chrs.begin(), used_chrs.end(), [&](int chr_id) {
         // Skip the mito chrom
-        if (_contig_names[chr_id] == mito_chr)
-            return;
+        //if (_contig_names[chr_id] == mito_chr)
+        //    return;
         if (_is_bed)
             return;
 
@@ -508,8 +508,8 @@ int D2C::taskflow()
                              for (auto& chr_id : used_chrs)
                              {
                                  // Skip the mito chrom
-                                 if (_contig_names[chr_id] == mito_chr)
-                                     continue;
+                                 //if (_contig_names[chr_id] == mito_chr)
+                                 //    continue;
                                  fs::path tmp_bam_file = temp_bam_path / (contigs[chr_id].first + ".bam");
                                  if (fs::exists(tmp_bam_file))
                                      bam_files.push_back(tmp_bam_file.string());
@@ -559,8 +559,8 @@ int D2C::taskflow()
                 for (auto& chr_id : used_chrs)
                 {
                     // Skip the mito chrom
-                    if (_contig_names[chr_id] == mito_chr)
-                        continue;
+                    //if (_contig_names[chr_id] == mito_chr)
+                    //    continue;
                     // spdlog::debug("final frags size: {} dup frags size: {} {}", _final_frags.size(), chr_id, _dup_frags[chr_id].size());
                     // _final_frags.insert(_final_frags.end(), _dup_frags[chr_id].begin(), _dup_frags[chr_id].end());
                     for (auto& frag : _dup_frags[chr_id])
