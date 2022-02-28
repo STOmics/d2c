@@ -499,6 +499,9 @@ int D2C::taskflow()
     // Step 7: merge bam files
     auto merge_bam = taskflow
                          .emplace([&]() {
+                             if (_is_bed)
+                                return;
+
                              Timer t;
                              spdlog::debug("Merge bam");
                              std::vector< std::string > bam_files;
