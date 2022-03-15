@@ -403,7 +403,7 @@ int D2C::taskflow()
         while (std::getline(ifs, line))
         {
             vector< string > vec_s = split_str(line, '\t');
-            if (vec_s.size() < 4)
+            if (vec_s.size() < 5)
                 continue;
             if (chr_to_int.count(vec_s[0]) == 0)
                 continue;
@@ -430,7 +430,8 @@ int D2C::taskflow()
             }
             bedpe.barcode = (runname << BBIT * 2) + (_barcode2int[b1] << BBIT) + _barcode2int[b2];
 
-            _bedpes_by_chr[chr_to_int[vec_s[0]]].push_back(bedpe);
+            auto& bedpes = _bedpes_by_chr[chr_to_int[vec_s[0]]];
+            bedpes.insert(bedpes.end(), stoi(vec_s[4]), bedpe);
         }
         ifs.close();
     }
