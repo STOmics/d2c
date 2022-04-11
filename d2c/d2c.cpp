@@ -1420,9 +1420,23 @@ int D2C::determineBarcodeMerge()
         if (one_to_one)
             barcode_combine = { barcode };
 
+        // Remove barcode which already mapped to drop_barcode
+        int size = 0;
+        for (int j = 0; j < barcode_combine.size(); ++j)
+        {
+            auto b = barcode_combine[j];
+            if (_drop_barcodes.count(b) != 0)
+            {
+                // It will be discarded because not exists in map bar2pos
+                barcode_combine[j] = -1;
+            }
+            else
+                ++size;
+        }
+
         // Make a drop barcode and save our progress
         stringstream ss;
-        ss << "_BC" << std::setfill('0') << std::setw(guess) << idx << "_N" << std::setw(2) << barcode_combine.size();
+        ss << "_BC" << std::setfill('0') << std::setw(guess) << idx << "_N" << std::setw(2) << size;
         for (auto& b : barcode_combine)
         {
             if (bar2pos.count(b) != 0)
