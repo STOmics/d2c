@@ -30,6 +30,10 @@ struct SumStat
     int    nuclear_uniq;
     int    mito_total;
     int    mito_uniq;
+    int    human_total;
+    int    human_uniq;
+    int    mouse_total;
+    int    mouse_uniq;
     int    library_size;
     float  dup_proportion;
     string drop_barcode;
@@ -106,7 +110,7 @@ private:
     vector< vector< AnnotateFragment > >                _dup_frags;
     vector< AnnotateFragment >                          _final_frags;
     vector< unordered_set< int > >            _keep_qnames;
-    vector< map< string, pair< int, int > > > _frag_stats;
+    vector< map< string, pair< unsigned long, unsigned long > > > _frag_stats; // ulong encode two uint32, for mix species
     vector< SumStat >                         _sum_stats;
 
     // Instance of sequencing saturation
