@@ -30,6 +30,10 @@ struct SumStat
     int    nuclear_uniq;
     int    mito_total;
     int    mito_uniq;
+    int    human_mito_total;
+    int    human_mito_uniq;
+    int    mouse_mito_total;
+    int    mouse_mito_uniq;
     int    human_total;
     int    human_uniq;
     int    mouse_total;
@@ -61,6 +65,7 @@ private:
     int                    determineBarcodeMerge();
     int                    reannotateFragByChr(int chr_id);
     int                    annotateBamByChr(int chr_id);
+    int                    simpleQC(vector<int>& used_chrs);
     int                    finalQC();
     int                    plot();
     bool                   checkTn5(string s);
@@ -81,7 +86,6 @@ private:
     bool     tn5;
     double   min_barcode_frags, min_jaccard_index;
     string   ref;
-    string   mito_chr;
     string   bed_genome_file, blacklist_file, trans_file;
     bool     species_mix;
     fs::path bin_path;
@@ -89,6 +93,9 @@ private:
     bool     saturation_on;
     string   barcode_list;
     string   barcode_runname_list;
+    // for mixed species
+    string   single_mc, human_mc, mouse_mc;
+    set<string> mito_chrs;
 
     // Specific parameters;
     int      nc_threshold;  // Number of barcodes that a paired-end read must be observed for the read to be filtered

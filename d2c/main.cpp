@@ -32,7 +32,7 @@ namespace fs = std::filesystem;
 
 //#define DEVEL
 constexpr auto APP_NAME    = "D2C";
-constexpr auto APP_VERSION = "1.4.2";
+constexpr auto APP_VERSION = "1.4.3";
 
 int main(int argc, char** argv)
 {
@@ -89,7 +89,7 @@ int main(int argc, char** argv)
 
     // Non-model organism
     string mito_chr, bed_genome_file, blacklist_file, trans_file;
-    sub_count->add_option("--mc", mito_chr, "Name of the mitochondrial chromosome");
+    sub_count->add_option("--mc", mito_chr, "Name of the mitochondrial chromosome, seperated by ',' for mixed species");
     sub_count->add_option("--bg", bed_genome_file, "Bedtools genome file")->check(CLI::ExistingFile);
     sub_count->add_option("--bl", blacklist_file, "Blacklist bed file")->check(CLI::ExistingFile);
     sub_count->add_option("--ts", trans_file, "Path bed file of transcription start sites")->check(CLI::ExistingFile);
@@ -106,6 +106,10 @@ int main(int argc, char** argv)
 
     bool saturation_on = false;
     sub_count->add_flag("--sat", saturation_on, "Output sequencing saturation file, default False");
+
+
+    bool species_mix = false;
+    sub_count->add_flag("--mix-species", species_mix, "Set species mixed, default False");
 
     string barcode_runname_list = "";
     // app.add_option("--br", barcode_runname_list, "Barcode runname list file, default
@@ -225,7 +229,6 @@ int main(int argc, char** argv)
 
         // Figure out if the specified reference genome is a species mix
         set< string > mix_species{ "hg19-mm10", "hg19_mm10_c", "hg19-mm10_nochr" };
-        bool          species_mix = false;
         if (mix_species.count(ref) != 0)
             species_mix = true;
 

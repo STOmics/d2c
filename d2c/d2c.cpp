@@ -285,7 +285,7 @@ D2C::D2C(string input_bam, string output_path, string barcode_in_tag, string bar
          string barcode_runname_list)
     : input_bam(input_bam), output_path(output_path), barcode_tag(barcode_in_tag), drop_tag(barcode_out_tag),
       mapq(mapq), cores(cores), run_name(run_name), tn5(tn5), min_barcode_frags(min_barcode_frags),
-      min_jaccard_index(min_jaccard_index), ref(ref), mito_chr(mito_chr), bed_genome_file(bed_genome_file),
+      min_jaccard_index(min_jaccard_index), ref(ref), bed_genome_file(bed_genome_file),
       blacklist_file(blacklist_file), trans_file(trans_file), species_mix(species_mix), bin_path(bin_path),
       barcode_threshold(barcode_threshold), jaccard_threshold(jaccard_threshold), saturation_on(saturation_on),
       barcode_list(barcode_list), barcode_runname_list(barcode_runname_list)
@@ -298,6 +298,30 @@ D2C::D2C(string input_bam, string output_path, string barcode_in_tag, string bar
         _is_bed = true;
     else
         _is_bed = false;
+
+    auto pos = mito_chr.find(',');
+    if (pos == std::string::npos)
+    {
+        single_mc = mito_chr;
+        mito_chrs.insert(single_mc);
+    }
+    else
+    {
+        string chr1 = mito_chr.substr(0, pos);
+        string chr2 = mito_chr.substr(pos+1);
+        if (chr1.at(0) == 'h' && chr2.at(0) == 'm')
+        {
+            human_mc = chr1;
+            mouse_mc = chr2;
+        }
+        else if (chr1.at(0) == 'm' && chr2.at(0) == 'h')
+        {
+            human_mc = chr2;
+            mouse_mc = chr1;
+        }
+        mito_chrs.insert(human_mc);
+        mito_chrs.insert(mouse_mc);
+    }
 }
 
 int D2C::run()
@@ -324,6 +348,15 @@ int D2C::run()
     if (!parseRunnameList())
     {
         spdlog::warn("Failed to parse runname list: {}", barcode_runname_list);
+        return -2;
+    }
+
+    // Check is make sense for mix_species and mito chrs 
+    if ((species_mix && (human_mc.empty() || mouse_mc.empty())) ||
+        (!species_mix && !human_mc.empty() && !mouse_mc.empty()))
+    {
+        spdlog::warn("species_mix is {} but human_mc is {} and mouse_mc is {}", 
+                species_mix, human_mc, mouse_mc);
         return -2;
     }
 
@@ -473,7 +506,7 @@ int D2C::taskflow()
     //         cout<<"has data chr: "<<i<<endl;
     auto [start_cal, end_cal] = taskflow.parallel_for(used_chrs.begin(), used_chrs.end(), [&](int chr_id) {
         // Skip the mito chrom
-        if (_contig_names[chr_id] == mito_chr)
+        if (mito_chrs.count(_contig_names[chr_id]))
             return;
         Timer t;
         D2C::computeStatByChr(chr_id);
@@ -649,113 +682,8 @@ int D2C::taskflow()
     // Step 9: simple qc
     auto simple_qc = taskflow
                          .emplace([&]() {
-                             Timer                           t;
-                             map< string, pair< unsigned long, unsigned long > > nuclear;
-                             int                             mito_pos = -1;
-                             for (auto& chr_id : used_chrs)
-                             {
-                                 if (_contig_names[chr_id] == mito_chr)
-                                 {
-                                     mito_pos = chr_id;
-                                     continue;
-                                 }
-
-                                 for (auto& p : _frag_stats[chr_id])
-                                 {
-                                     if (p.second.first == 0 || p.second.second == 0)
-                                         continue;
-                                     nuclear[p.first].first += p.second.first;
-                                     nuclear[p.first].second += p.second.second;
-                                 }
-                                 _frag_stats[chr_id].clear();
-                             }
-                             // May not have mito chr
-                             if (mito_pos != -1)
-                             {
-                                 auto&                                     mito = _frag_stats[mito_pos];
-                                 map< string, pair< unsigned long, unsigned long > >::iterator it;
-                                 for (auto& p : mito)
-                                 {
-                                     if (p.second.first == 0 || p.second.second == 0)
-                                         continue;
-                                     it = nuclear.find(p.first);
-                                     if (it == nuclear.end())
-                                         continue;
-
-                                     SumStat ss;
-                                     ss.drop_barcode  = p.first;
-                                     if (!species_mix)
-                                     {
-                                         ss.nuclear_total = it->second.first;
-                                         ss.nuclear_uniq  = it->second.second;
-                                         ss.mito_total    = p.second.first;
-                                         ss.mito_uniq     = p.second.second;
-                                     }
-                                     else
-                                     {
-                                         int totalCnt, humanCnt, mouseCnt;
-                                         decodeSpeciesMix(it->second.first, totalCnt, humanCnt, mouseCnt);
-                                         ss.nuclear_total = totalCnt;
-                                         ss.human_total = humanCnt;
-                                         ss.mouse_total = mouseCnt;
-                                         decodeSpeciesMix(it->second.second, totalCnt, humanCnt, mouseCnt);
-                                         ss.nuclear_uniq = totalCnt;
-                                         ss.human_uniq = humanCnt;
-                                         ss.mouse_uniq = mouseCnt;
-
-                                         decodeSpeciesMix(p.second.first, totalCnt, humanCnt, mouseCnt);
-                                         ss.mito_total    = totalCnt;
-                                         decodeSpeciesMix(p.second.second, totalCnt, humanCnt, mouseCnt);
-                                         ss.mito_uniq     = totalCnt;
-                                     }
-
-                                     _sum_stats.push_back(ss);
-                                 }
-                             }
-                             else
-                             {
-                                // Stay useful infomation except mito
-                                for (auto& [cell_barcode, count_pair] : nuclear)
-                                {
-                                    SumStat ss;
-                                    ss.drop_barcode = cell_barcode;
-                                    ss.mito_total = 0;
-                                    ss.mito_uniq = 0;
-                                    if (!species_mix)
-                                    {
-                                        ss.nuclear_total = count_pair.first;
-                                        ss.nuclear_uniq  = count_pair.second;
-                                    }
-                                    else
-                                    {
-                                        int totalCnt, humanCnt, mouseCnt;
-                                        decodeSpeciesMix(count_pair.first, totalCnt, humanCnt, mouseCnt);
-                                        ss.nuclear_total = totalCnt;
-                                        ss.human_total = humanCnt;
-                                        ss.mouse_total = mouseCnt;
-                                        decodeSpeciesMix(count_pair.second, totalCnt, humanCnt, mouseCnt);
-                                        ss.nuclear_uniq = totalCnt;
-                                        ss.human_uniq = humanCnt;
-                                        ss.mouse_uniq = mouseCnt;
-                                    }
-                                    _sum_stats.push_back(ss);
-                                }
-                             }
-                             // fs::path out_ss_file = output_path / (run_name + BASIC_QC_FILE);
-                             // FILE*    out_ss;
-                             // out_ss = fopen(out_ss_file.c_str(), "w");
-                             // string header =
-                             //     "cell_barcode\ttotalNuclearFrags\tuniqueNuclearFrags\ttotalMitoFrags\tuniqueMitoFrags\n";
-                             // fwrite(header.c_str(), 1, header.size(), out_ss);
-                             // for (auto& l : _sum_stats)
-                             // {
-                             //     string s = l.drop_barcode + '\t' + to_string(l.nuclear_total) + '\t' +
-                             //     to_string(l.nuclear_uniq)
-                             //                + '\t' + to_string(l.mito_total) + '\t' + to_string(l.mito_uniq) + '\n';
-                             //     fwrite(s.c_str(), 1, s.size(), out_ss);
-                             // }
-                             // fclose(out_ss);
-
+                             Timer t;
+                             D2C::simpleQC(used_chrs);
                              spdlog::info("Simple qc time(s): {:.2f}", t.toc(1000));
                          })
                          .name("Simple qc");
@@ -1692,6 +1620,166 @@ int D2C::annotateBamByChr(int chr_id)
     return 0;
 }
 
+int D2C::simpleQC(vector<int>& used_chrs)
+{
+     map< string, pair< unsigned long, unsigned long > > nuclear;
+     int single_mito_pos = -1, human_mc_pos = -1, mouse_mc_pos = -1;
+     for (auto& chr_id : used_chrs)
+     {
+         if (_contig_names[chr_id] == single_mc)
+         {
+             single_mito_pos = chr_id;
+             continue;
+         }
+         else if (_contig_names[chr_id] == human_mc)
+         {
+             human_mc_pos = chr_id;
+             continue;
+         }
+         else if (_contig_names[chr_id] == mouse_mc)
+         {
+             mouse_mc_pos = chr_id;
+             continue;
+         }
+
+         for (auto& p : _frag_stats[chr_id])
+         {
+             if (p.second.first == 0 || p.second.second == 0)
+                 continue;
+             nuclear[p.first].first += p.second.first;
+             nuclear[p.first].second += p.second.second;
+         }
+         _frag_stats[chr_id].clear();
+     }
+     if (species_mix)
+     {
+         // for mixed species, there is more values to process
+         if (human_mc_pos == -1 && mouse_mc_pos == -1)
+         {
+            for (auto& [cell_barcode, count_pair] : nuclear)
+            {
+                SumStat ss;
+                ss.drop_barcode = cell_barcode;
+                ss.mito_total = 0;
+                ss.mito_uniq = 0;
+                ss.human_mito_total = 0;
+                ss.human_mito_uniq = 0;
+                ss.mouse_mito_total = 0;
+                ss.mouse_mito_uniq = 0;
+
+                int totalCnt, humanCnt, mouseCnt;
+                decodeSpeciesMix(count_pair.first, totalCnt, humanCnt, mouseCnt);
+                ss.nuclear_total = totalCnt;
+                ss.human_total = humanCnt;
+                ss.mouse_total = mouseCnt;
+                decodeSpeciesMix(count_pair.second, totalCnt, humanCnt, mouseCnt);
+                ss.nuclear_uniq = totalCnt;
+                ss.human_uniq = humanCnt;
+                ss.mouse_uniq = mouseCnt;
+
+                _sum_stats.push_back(ss);
+            }
+         }
+         else
+         {
+             set<string> mito_cell_barcodes;
+             map< string, pair< unsigned long, unsigned long > > human_stats, mouse_stats;
+             if (human_mc_pos != -1)
+                 human_stats.swap(_frag_stats[human_mc_pos]);
+             for (auto& [cb,_] : human_stats)
+                 mito_cell_barcodes.insert(cb);
+             if (mouse_mc_pos != -1)
+                 mouse_stats.swap(_frag_stats[mouse_mc_pos]);
+             for (auto& [cb,_] : mouse_stats)
+                 mito_cell_barcodes.insert(cb);
+
+             map< string, pair< unsigned long, unsigned long > >::iterator it;
+             for (auto& cb : mito_cell_barcodes)
+             {
+                 it = nuclear.find(cb);
+                 if (it == nuclear.end())
+                     continue;
+
+                 SumStat ss;
+                 ss.drop_barcode  = cb;
+                 int totalCnt, humanCnt, mouseCnt;
+                 decodeSpeciesMix(it->second.first, totalCnt, humanCnt, mouseCnt);
+                 ss.nuclear_total = totalCnt;
+                 ss.human_total = humanCnt;
+                 ss.mouse_total = mouseCnt;
+                 decodeSpeciesMix(it->second.second, totalCnt, humanCnt, mouseCnt);
+                 ss.nuclear_uniq = totalCnt;
+                 ss.human_uniq = humanCnt;
+                 ss.mouse_uniq = mouseCnt;
+
+                 it = human_stats.find(cb);
+                 if (it != human_stats.end())
+                 {
+                     decodeSpeciesMix(it->second.first, totalCnt, humanCnt, mouseCnt);
+                     ss.human_mito_total    = totalCnt;
+                     decodeSpeciesMix(it->second.second, totalCnt, humanCnt, mouseCnt);
+                     ss.human_mito_uniq     = totalCnt;
+                 }
+
+                 it = mouse_stats.find(cb);
+                 if (it != mouse_stats.end())
+                 {
+                     decodeSpeciesMix(it->second.first, totalCnt, humanCnt, mouseCnt);
+                     ss.mouse_mito_total     = totalCnt;
+                     decodeSpeciesMix(it->second.second, totalCnt, humanCnt, mouseCnt);
+                     ss.mouse_mito_uniq     = totalCnt;
+                 }
+
+                 ss.mito_total    = ss.human_mito_total + ss.mouse_mito_total;
+                 ss.mito_uniq     = ss.human_mito_uniq + ss.mouse_mito_uniq;
+
+                 _sum_stats.push_back(ss);
+             }
+         }
+     }
+     else
+     {
+         // No mito found
+         // Stay useful infomation except mito
+         if (single_mito_pos == -1)
+         {
+            for (auto& [cell_barcode, count_pair] : nuclear)
+            {
+                SumStat ss;
+                ss.drop_barcode = cell_barcode;
+                ss.mito_total = 0;
+                ss.mito_uniq = 0;
+                ss.nuclear_total = count_pair.first;
+                ss.nuclear_uniq  = count_pair.second;
+
+                _sum_stats.push_back(ss);
+            }
+         }
+         else
+         {
+             auto&                                     mito = _frag_stats[single_mito_pos];
+             map< string, pair< unsigned long, unsigned long > >::iterator it;
+             for (auto& p : mito)
+             {
+                 if (p.second.first == 0 || p.second.second == 0)
+                     continue;
+                 it = nuclear.find(p.first);
+                 if (it == nuclear.end())
+                     continue;
+
+                 SumStat ss;
+                 ss.drop_barcode  = p.first;
+                 ss.nuclear_total = it->second.first;
+                 ss.nuclear_uniq  = it->second.second;
+                 ss.mito_total    = p.second.first;
+                 ss.mito_uniq     = p.second.second;
+                 _sum_stats.push_back(ss);
+             }
+         }
+     }
+    return 0;
+}
+
 int D2C::finalQC()
 {
     // Load tss file for finding overlaps
@@ -1790,7 +1878,7 @@ int D2C::finalQC()
         "CellBarcode\ttotalFrags\tuniqueFrags\ttotalMitoFrags\tuniqueMitoFrags\tduplicateProportion\ttssProportion\tMitoProportion\n";
     if (species_mix)
         header =
-        "CellBarcode\ttotalFrags\tuniqueFrags\ttotalMitoFrags\tuniqueMitoFrags\ttotalHumanFrags\tuniqueHumanFrags\ttotalMouseFrags\tuniqueMouseFrags\tduplicateProportion\ttssProportion\tMitoProportion\n";
+        "CellBarcode\ttotalFrags\tuniqueFrags\ttotalMitoFrags\tuniqueMitoFrags\ttotalHumanMitoFrags\tuniqHumanMitoFrags\ttotalMouseMitoFrags\tuniqMouseMitoFrags\ttotalHumanFrags\tuniqueHumanFrags\ttotalMouseFrags\tuniqueMouseFrags\tduplicateProportion\ttssProportion\tMitoProportion\n";
 
     fwrite(header.c_str(), 1, header.size(), qc_out);
     map< string, SummaryData >::iterator it;
@@ -1805,7 +1893,9 @@ int D2C::finalQC()
                    + to_string(l.mito_total) + FSEP + to_string(l.mito_uniq) + FSEP;
 
         if (species_mix)
-            s += to_string(l.human_total) + FSEP + to_string(l.human_uniq) + FSEP
+            s += to_string(l.human_mito_total) + FSEP + to_string(l.human_mito_uniq) + FSEP
+                 + to_string(l.mouse_mito_total) + FSEP + to_string(l.mouse_mito_uniq) + FSEP
+                 + to_string(l.human_total) + FSEP + to_string(l.human_uniq) + FSEP
                  + to_string(l.mouse_total) + FSEP + to_string(l.mouse_uniq) + FSEP;
 
         s += f2str(l.dup_proportion, 4) + FSEP
