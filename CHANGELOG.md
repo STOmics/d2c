@@ -1,5 +1,12 @@
 # Change Log
 
+## 1.4.3(2022-05-07)
+
+功能:
+
+* 增加参数 --mix-species 以支持用户设置混合样品,此时--mc必须输入两个mito,用逗号分割
+* 更新meta统计,加入totalMouseMitoFrag totalHumanMitoFrag uniqMouseMitoFrag uniqHumanMitoFrag
+
 ## 1.4.2(2022-04-14)
 
 功能:
