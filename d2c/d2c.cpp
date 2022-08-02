@@ -1682,19 +1682,14 @@ int D2C::simpleQC(vector<int>& used_chrs)
          }
          else
          {
-             set<string> mito_cell_barcodes;
              map< string, pair< unsigned long, unsigned long > > human_stats, mouse_stats;
              if (human_mc_pos != -1)
                  human_stats.swap(_frag_stats[human_mc_pos]);
-             for (auto& [cb,_] : human_stats)
-                 mito_cell_barcodes.insert(cb);
              if (mouse_mc_pos != -1)
                  mouse_stats.swap(_frag_stats[mouse_mc_pos]);
-             for (auto& [cb,_] : mouse_stats)
-                 mito_cell_barcodes.insert(cb);
 
              map< string, pair< unsigned long, unsigned long > >::iterator it;
-             for (auto& cb : mito_cell_barcodes)
+             for (auto& cb : _idx2drop)
              {
                  it = nuclear.find(cb);
                  if (it == nuclear.end())
@@ -1759,20 +1754,26 @@ int D2C::simpleQC(vector<int>& used_chrs)
          {
              auto&                                     mito = _frag_stats[single_mito_pos];
              map< string, pair< unsigned long, unsigned long > >::iterator it;
-             for (auto& p : mito)
+             for (auto& cb : _idx2drop)
              {
-                 if (p.second.first == 0 || p.second.second == 0)
-                     continue;
-                 it = nuclear.find(p.first);
+                 it = nuclear.find(cb);
                  if (it == nuclear.end())
                      continue;
 
                  SumStat ss;
-                 ss.drop_barcode  = p.first;
+                 ss.drop_barcode  = cb;
                  ss.nuclear_total = it->second.first;
                  ss.nuclear_uniq  = it->second.second;
-                 ss.mito_total    = p.second.first;
-                 ss.mito_uniq     = p.second.second;
+                 if (mito.count(cb))
+                 {
+                     ss.mito_total    = mito[cb].first;
+                     ss.mito_uniq     = mito[cb].second;
+                 }
+                 else
+                 {
+                     ss.mito_total    = 0;
+                     ss.mito_uniq     = 0;
+                 }
                  _sum_stats.push_back(ss);
              }
          }
