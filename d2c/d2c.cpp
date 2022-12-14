@@ -888,10 +888,13 @@ int D2C::splitBamByChr(int chr_id)
     // total_cnt);
 
     // Merge bead quant of all chrs
-    std::lock_guard< std::mutex > guard(_merge_chr_mutex);
-    for (auto& b : bead_quant)
-        _total_bead_quant[b.first] += b.second;
-    spdlog::debug("_total_bead_quant size: {}", _total_bead_quant.size());
+    if (!mito_chrs.count(_contig_names[chr_id]))
+    {
+        std::lock_guard< std::mutex > guard(_merge_chr_mutex);
+        for (auto& b : bead_quant)
+            _total_bead_quant[b.first] += b.second;
+        spdlog::debug("_total_bead_quant size: {}", _total_bead_quant.size());
+    }
 
     return 0;
 }
