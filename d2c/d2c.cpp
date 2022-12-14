@@ -279,7 +279,7 @@ void D2C::extractBedPE(const BamRecord b1, const BamRecord b2, vector< Bedpe >& 
 }
 
 D2C::D2C(string input_bam, string output_path, string barcode_in_tag, string barcode_out_tag, int mapq, int cores,
-         string run_name, bool tn5, double min_barcode_frags, double min_jaccard_index, string ref, string mito_chr,
+         string run_name, int tn5, double min_barcode_frags, double min_jaccard_index, string ref, string mito_chr,
          string bed_genome_file, string blacklist_file, string trans_file, bool species_mix, string bin_path,
          int barcode_threshold, int jaccard_threshold, bool saturation_on, string barcode_list,
          string barcode_runname_list)
@@ -1143,7 +1143,8 @@ int D2C::computeStatByChr(int chr_id)
     return 0;
 }
 
-inline string substrRight(string s, int n = 6)
+// change default n from 6 to user input
+inline string substrRight(string s, int n)
 {
     return s.substr(s.size() - n);
 }
@@ -1160,7 +1161,7 @@ bool D2C::checkTn5(string s)
 
     string s1 = s.substr(0, pos);
     string s2 = s.substr(pos + 1);
-    return (substrRight(s1) == substrRight(s2));
+    return (substrRight(s1, tn5) == substrRight(s2, tn5));
 }
 // Example: int32int32
 bool D2C::checkTn5(size_t l)
@@ -1170,7 +1171,7 @@ bool D2C::checkTn5(size_t l)
 
     string s1 = int2Barcode(int(l >> 32));
     string s2 = int2Barcode(int(l & 0xFFFF));
-    return (substrRight(s1) == substrRight(s2));
+    return (substrRight(s1, tn5) == substrRight(s2, tn5));
 }
 
 int D2C::determineBarcodeMerge()
@@ -1190,7 +1191,7 @@ int D2C::determineBarcodeMerge()
     spdlog::debug("_total_bead_cnts size: {}", _total_bead_cnts.size());
     // Merge all barcode count
     spp::sparse_hash_map< size_t, int > sum_dt;
-    if (tn5)
+    if (tn5 != 0)
     {
         for (auto& m : _total_bead_cnts)
         {
@@ -1413,10 +1414,10 @@ int D2C::determineBarcodeMerge()
             if (bar2pos.count(b) != 0)
             {
                 string drop_barcode;
-                if (!tn5)
+                if (tn5 == 0)
                     drop_barcode = run_name + ss.str();
                 else
-                    drop_barcode = run_name + "_Tn5-" + substrRight(int2Barcode(b)) + ss.str();
+                    drop_barcode = run_name + "_Tn5-" + substrRight(int2Barcode(b), tn5) + ss.str();
                 
                 if (_idx2drop.empty() || drop_barcode != _idx2drop.back())
                     _idx2drop.push_back(std::move(drop_barcode));

@@ -74,8 +74,8 @@ int main(int argc, char** argv)
     sub_count->add_option("--mapq", mapq, "Filter thrshold of mapping quality, default 30");
     int cores = std::thread::hardware_concurrency();
     sub_count->add_option("-c", cores, "CPU core number, default detect")->check(CLI::PositiveNumber);
-    bool tn5 = false;
-    sub_count->add_flag("--tn5", tn5, "Process data knowing that the barcodes were generated with a barcoded Tn5");
+    int tn5 = 0;
+    sub_count->add_option("--tn5", tn5, "Process data knowing that the barcodes were generated with a barcoded Tn5, default 0")->check(CLI::PositiveNumber);
     double min_barcode_frags = 0.0;
     sub_count->add_option("--bf", min_barcode_frags,
                           "Minimum number of fragments to be thresholded for doublet merging");

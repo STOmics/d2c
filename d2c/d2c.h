@@ -47,7 +47,7 @@ class D2C
 {
 public:
     D2C(string input_bam, string output_path, string barcode_in_tag, string barcode_out_tag, int mapq, int cores,
-        string run_name, bool tn5, double min_barcode_frags, double min_jaccard_index, string ref, string mito_chr,
+        string run_name, int tn5, double min_barcode_frags, double min_jaccard_index, string ref, string mito_chr,
         string bed_genome_file, string blacklist_file, string trans_file, bool species_mix, string bin_path,
         int barcode_threshold, int jaccard_threshold, bool saturation_on, string barcode_list,
         string barcode_runname_list);
@@ -83,7 +83,7 @@ private:
     string   drop_tag;
     int      mapq, cores;
     string   run_name;
-    bool     tn5;
+    int     tn5;
     double   min_barcode_frags, min_jaccard_index;
     string   ref;
     string   bed_genome_file, blacklist_file, trans_file;
