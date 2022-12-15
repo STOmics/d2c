@@ -7,7 +7,7 @@
 
 ## 确定HQ barcodes
 
-根据次数,使用KDE(核密度估计)方法计算骤降点,从而过滤出来HQ barcodes
+根据barcode的次数,使用KDE(核密度估计)方法计算骤降点,从而过滤出来HQ barcodes
 
 ## 计算reads overlap
 

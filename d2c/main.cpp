@@ -98,6 +98,11 @@ int main(int argc, char** argv)
     int barcode_threshold = 0;
     sub_count->add_option("--bp", barcode_threshold, "Top N number of fragments to be thresholded for doublet merging")
         ->check(CLI::PositiveNumber);
+
+    int beads_force = 0;
+    sub_count->add_option("--fb", beads_force, "Top N number of fragments to be thresholded when calculated threshold is too large")
+        ->check(CLI::NonNegativeNumber);
+
     int jaccard_threshold = 0;
     sub_count
         ->add_option("--jp", jaccard_threshold,
@@ -236,16 +241,16 @@ int main(int argc, char** argv)
                                   "mapq:{} cores:{} run_name:{} tn5:{} min_barcode_frags:{} min_jaccard_index:{} "
                                   "ref:{} mito_chr:{} bed_genome_file:{} blacklist_file:{} trans_file:{} "
                                   "species_mix:{} barcode_threshold:{} jaccard_threshold:{} saturation_on:{} "
-                                  "barcode_list:{} barcode_runname_list:{}",
+                                  "barcode_list:{} barcode_runname_list:{} beads_force:{}",
                                   argv[0], input_bam, output_path, barcode_in_tag, barcode_out_tag, mapq, cores,
                                   run_name, tn5, min_barcode_frags, min_jaccard_index, ref, mito_chr, bed_genome_file,
                                   blacklist_file, trans_file, species_mix, barcode_threshold, jaccard_threshold,
-                                  saturation_on, barcode_list, barcode_runname_list);
+                                  saturation_on, barcode_list, barcode_runname_list, beads_force);
 
         D2C d2c = D2C(input_bam, output_path, barcode_in_tag, barcode_out_tag, mapq, cores, run_name, tn5,
                       min_barcode_frags, min_jaccard_index, ref, mito_chr, bed_genome_file, blacklist_file, trans_file,
                       species_mix, exe_path.string(), barcode_threshold, jaccard_threshold, saturation_on, barcode_list,
-                      barcode_runname_list);
+                      barcode_runname_list, beads_force);
         try
         {
             d2c.run();

@@ -50,7 +50,7 @@ public:
         string run_name, int tn5, double min_barcode_frags, double min_jaccard_index, string ref, string mito_chr,
         string bed_genome_file, string blacklist_file, string trans_file, bool species_mix, string bin_path,
         int barcode_threshold, int jaccard_threshold, bool saturation_on, string barcode_list,
-        string barcode_runname_list);
+        string barcode_runname_list, int beads_force);
     ~D2C(){};
     int run();
     int taskflow();
@@ -93,6 +93,7 @@ private:
     bool     saturation_on;
     string   barcode_list;
     string   barcode_runname_list;
+    int  beads_force;
     // for mixed species
     string   single_mc, human_mc, mouse_mc;
     set<string> mito_chrs;

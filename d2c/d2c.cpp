@@ -282,13 +282,13 @@ D2C::D2C(string input_bam, string output_path, string barcode_in_tag, string bar
          string run_name, int tn5, double min_barcode_frags, double min_jaccard_index, string ref, string mito_chr,
          string bed_genome_file, string blacklist_file, string trans_file, bool species_mix, string bin_path,
          int barcode_threshold, int jaccard_threshold, bool saturation_on, string barcode_list,
-         string barcode_runname_list)
+         string barcode_runname_list, int beads_force)
     : input_bam(input_bam), output_path(output_path), barcode_tag(barcode_in_tag), drop_tag(barcode_out_tag),
       mapq(mapq), cores(cores), run_name(run_name), tn5(tn5), min_barcode_frags(min_barcode_frags),
       min_jaccard_index(min_jaccard_index), ref(ref), bed_genome_file(bed_genome_file),
       blacklist_file(blacklist_file), trans_file(trans_file), species_mix(species_mix), bin_path(bin_path),
       barcode_threshold(barcode_threshold), jaccard_threshold(jaccard_threshold), saturation_on(saturation_on),
-      barcode_list(barcode_list), barcode_runname_list(barcode_runname_list)
+      barcode_list(barcode_list), barcode_runname_list(barcode_runname_list), beads_force(beads_force)
 {
     nc_threshold         = 6;
     regularize_threshold = 4;
@@ -986,6 +986,15 @@ int D2C::determineHQBeads()
         }
 
         min_barcode_frags = barcode_rank(cnts, INFLECTION_KERNEL_TYPE::DROPLETUTILS, CURVE_DATA_TYPE::BEAD);
+           
+        if (beads_force != 0)
+        {
+            std::sort(cnts.begin(), cnts.end(), std::greater< double >());
+            int tmp = beads_force <= static_cast< int >(cnts.size()) ? cnts[beads_force - 1] : cnts.back();
+            spdlog::debug("bead_force_frags: {} min_barcode_frags: {}", tmp, min_barcode_frags);
+            if (min_barcode_frags < tmp)
+                min_barcode_frags = tmp;
+        }
     }
 
     ofs << "bead_cutoff" << FSEP << min_barcode_frags << endl;
