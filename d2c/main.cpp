@@ -32,7 +32,7 @@ namespace fs = std::filesystem;
 
 //#define DEVEL
 constexpr auto APP_NAME    = "D2C";
-constexpr auto APP_VERSION = "1.4.4";
+constexpr auto APP_VERSION = "1.4.5";
 
 int main(int argc, char** argv)
 {
