@@ -70,6 +70,7 @@ int main(int argc, char** argv)
 
     string barcode_list = (exe_path / "barcode.list").string();
     sub_count->add_option("-b", barcode_list, "Barcode list file")->check(CLI::ExistingFile);
+    string tn5_list = (exe_path / "tn5.list").string();
     int mapq = 30;
     sub_count->add_option("--mapq", mapq, "Filter thrshold of mapping quality, default 30");
     int cores = std::thread::hardware_concurrency();
@@ -241,16 +242,16 @@ int main(int argc, char** argv)
                                   "mapq:{} cores:{} run_name:{} tn5:{} min_barcode_frags:{} min_jaccard_index:{} "
                                   "ref:{} mito_chr:{} bed_genome_file:{} blacklist_file:{} trans_file:{} "
                                   "species_mix:{} barcode_threshold:{} jaccard_threshold:{} saturation_on:{} "
-                                  "barcode_list:{} barcode_runname_list:{} beads_force:{}",
+                                  "barcode_list:{} barcode_runname_list:{} beads_force:{} tn5_list:{}",
                                   argv[0], input_bam, output_path, barcode_in_tag, barcode_out_tag, mapq, cores,
                                   run_name, tn5, min_barcode_frags, min_jaccard_index, ref, mito_chr, bed_genome_file,
                                   blacklist_file, trans_file, species_mix, barcode_threshold, jaccard_threshold,
-                                  saturation_on, barcode_list, barcode_runname_list, beads_force);
+                                  saturation_on, barcode_list, barcode_runname_list, beads_force, tn5_list);
 
         D2C d2c = D2C(input_bam, output_path, barcode_in_tag, barcode_out_tag, mapq, cores, run_name, tn5,
                       min_barcode_frags, min_jaccard_index, ref, mito_chr, bed_genome_file, blacklist_file, trans_file,
                       species_mix, exe_path.string(), barcode_threshold, jaccard_threshold, saturation_on, barcode_list,
-                      barcode_runname_list, beads_force);
+                      barcode_runname_list, beads_force, tn5_list);
         try
         {
             d2c.run();

@@ -50,7 +50,7 @@ public:
         string run_name, int tn5, double min_barcode_frags, double min_jaccard_index, string ref, string mito_chr,
         string bed_genome_file, string blacklist_file, string trans_file, bool species_mix, string bin_path,
         int barcode_threshold, int jaccard_threshold, bool saturation_on, string barcode_list,
-        string barcode_runname_list, int beads_force);
+        string barcode_runname_list, int beads_force, string tn5_list);
     ~D2C(){};
     int run();
     int taskflow();
@@ -72,8 +72,9 @@ private:
     bool                   checkTn5(size_t l);
     bool                   parseBarcodeList();
     inline string          int2Barcode(int i);
-    inline string          int2Runname(int i);
+    inline string          int2Tn5(int i);
     bool                   parseRunnameList();
+    bool    parseTn5List();
 
 private:
     // Input parameters
@@ -94,6 +95,8 @@ private:
     string   barcode_list;
     string   barcode_runname_list;
     int  beads_force;
+    string tn5_list;
+
     // for mixed species
     string   single_mc, human_mc, mouse_mc;
     set<string> mito_chrs;
@@ -130,12 +133,17 @@ private:
 
     // Barcode runnames, just keep run name in bead barcodes
     // Note: runnames starts with '-', and the string in first position is empty string
-    vector< string >             _runnames;
-    unordered_map< string, int > _runname2int;
+    // vector< string >             _runnames;
+    // unordered_map< string, int > _runname2int;
+    string _runname;
 
     // Index to drop barcodes, encoding barcodes to int
     vector<string> _idx2drop;
 
     // Check input file type
     bool _is_bed;
+
+    // Encode tn5 sequence to integer
+    vector<string> _tail_names;
+    unordered_map<string, int> _tail2int;
 };

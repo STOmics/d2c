@@ -41,3 +41,4 @@ target_link_libraries(app
 
 set_target_properties(app PROPERTIES OUTPUT_NAME "d2c")
 install(FILES barcode.list DESTINATION bin)
+install(FILES tn5.list DESTINATION bin)

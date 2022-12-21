@@ -264,13 +264,8 @@ void D2C::extractBedPE(const BamRecord b1, const BamRecord b2, vector< Bedpe >& 
                 spdlog::warn("Invalid barcode {} not exists in barcode list", barcode);
                 return;
             }
-            int runname = 0;
-            if (barcode.size() > BBLEN)
-            {
-                string tmp = barcode.substr(BBLEN);
-                runname    = _runname2int[tmp];
-            }
-            bedpe.barcode = (runname << BBIT * 2) + (_barcode2int[b1] << BBIT) + _barcode2int[b2];
+            // There is not exists tn5 sequence in bam format
+            bedpe.barcode = (_barcode2int[b1] << BBIT) + _barcode2int[b2];
 
             // cout<<b1<<" "<<b2<<" "<<bedpe.barcode<<endl;
             bedpes.push_back(bedpe);
@@ -282,13 +277,14 @@ D2C::D2C(string input_bam, string output_path, string barcode_in_tag, string bar
          string run_name, int tn5, double min_barcode_frags, double min_jaccard_index, string ref, string mito_chr,
          string bed_genome_file, string blacklist_file, string trans_file, bool species_mix, string bin_path,
          int barcode_threshold, int jaccard_threshold, bool saturation_on, string barcode_list,
-         string barcode_runname_list, int beads_force)
+         string barcode_runname_list, int beads_force, string tn5_list)
     : input_bam(input_bam), output_path(output_path), barcode_tag(barcode_in_tag), drop_tag(barcode_out_tag),
       mapq(mapq), cores(cores), run_name(run_name), tn5(tn5), min_barcode_frags(min_barcode_frags),
       min_jaccard_index(min_jaccard_index), ref(ref), bed_genome_file(bed_genome_file),
       blacklist_file(blacklist_file), trans_file(trans_file), species_mix(species_mix), bin_path(bin_path),
       barcode_threshold(barcode_threshold), jaccard_threshold(jaccard_threshold), saturation_on(saturation_on),
-      barcode_list(barcode_list), barcode_runname_list(barcode_runname_list), beads_force(beads_force)
+      barcode_list(barcode_list), barcode_runname_list(barcode_runname_list), beads_force(beads_force),
+      tn5_list(tn5_list)
 {
     nc_threshold         = 6;
     regularize_threshold = 4;
@@ -350,7 +346,9 @@ int D2C::run()
         spdlog::warn("Failed to parse runname list: {}", barcode_runname_list);
         return -2;
     }
-
+    // Parse tn5 list
+    parseTn5List();
+        
     // Check is make sense for mix_species and mito chrs 
     if ((species_mix && (human_mc.empty() || mouse_mc.empty())) ||
         (!species_mix && !human_mc.empty() && !mouse_mc.empty()))
@@ -462,13 +460,18 @@ int D2C::taskflow()
             bedpe.qname1 = 0;
             bedpe.qname2 = 0;
 
-            int runname = 0;
+            int tail = 0;
             if (barcode.size() > BBLEN)
             {
                 string tmp = barcode.substr(BBLEN);
-                runname    = _runname2int[tmp];
+                if (_tail2int.count(tmp) == 0)
+                {
+                    spdlog::warn("Invalid tn5 {} not exists in tn5.list", barcode);
+                    continue;
+                }
+                tail = _tail2int[tmp];
             }
-            bedpe.barcode = (runname << BBIT * 2) + (_barcode2int[b1] << BBIT) + _barcode2int[b2];
+            bedpe.barcode = (tail << BBIT * 2) + (_barcode2int[b1] << BBIT) + _barcode2int[b2];
 
             auto& bedpes = _bedpes_by_chr[chr_to_int[vec_s[0]]];
             bedpes.insert(bedpes.end(), stoi(vec_s[4]), bedpe);
@@ -788,25 +791,6 @@ int D2C::splitBamByChr(int chr_id)
     spdlog::debug("chr: {} frags size: {}", chr_str, bedpes.size());
     spdlog::debug("chr: {} memory(MB): {}", chr_str, physical_memory_used_by_process());
 
-    // Devel
-    // if (chr_str == "chrX")
-    // {
-    //     // ofstream ofs(output_path/"chrX.bedpe.annotated.tsv", std::ofstream::out);
-    //     fs::path temp_path = output_path/"chrX.bedpe.annotated.tsv";
-    //     FILE *temp;
-    //     temp = fopen(temp_path.c_str(), "w");
-    //     for (auto& p : bedpes)
-    //     {
-    //         // ofs<<p.start<<'\t'<<p.end<<'\t'<<int2Barcode(p.barcode)<<int2Runname(p.barcode)<<endl;
-    //         string s =
-    //         to_string(p.start)+"\t"+to_string(p.end)+"\t"+int2Barcode(p.barcode)+int2Runname(p.barcode)+"\n";
-    //         fwrite(s.c_str(), 1, s.size(), temp);
-    //     }
-
-    //     //ofs.close();
-    //     fclose(temp);
-    // }
-
     // Load blacklist file and construct interval tree
     vector< Node > nodes;
     string         line;
@@ -942,10 +926,8 @@ int D2C::determineHQBeads()
     spdlog::debug("Dump bead quant to:{}", filename.string());
     out_bead_quant = fopen(filename.c_str(), "w");
     for (auto& b : _total_bead_quant)
-    // for (auto& b : _total_bead_order)
     {
-        string s = int2Barcode(b.first) + int2Runname(b.first) + FSEP + to_string(b.second) + "\n";
-        // string s = b + FSEP + to_string(_total_bead_quant[b]) + "\n";
+        string s = int2Barcode(b.first) + _runname + FSEP + to_string(b.second) + "\n";
         fwrite(s.c_str(), 1, s.size(), out_bead_quant);
     }
     fclose(out_bead_quant);
@@ -1006,12 +988,6 @@ int D2C::determineHQBeads()
         if (p.second >= min_barcode_frags)
             _hq_beads.insert(p.first);
     }
-    // Export high-quality beads
-    // fs::path out_hq_file = output_path / (run_name + HQ_BEADS_FILE);
-    // ofstream out_hq(out_hq_file.string(), std::ofstream::out);
-    // for (auto& b : _hq_beads)
-    //     out_hq << int2Barcode(b) << int2Runname(b) << "\n";
-    // out_hq.close();
 
     spdlog::debug("bead cutoff: {}", min_barcode_frags);
     spdlog::debug("total beads num: {} filter by min frags cutoff: {}", _total_bead_quant.size(), _hq_beads.size());
@@ -1329,7 +1305,7 @@ int D2C::determineBarcodeMerge()
         auto&  p  = ovdf[i];
         int    b1 = p.first >> 32;
         int    b2 = p.first & 0xFFFFFFFF;
-        string s  = int2Barcode(b1) + int2Runname(b1) + FSEP + int2Barcode(b2) + int2Runname(b2) + FSEP;
+        string s  = int2Barcode(b1) + _runname + FSEP + int2Barcode(b2) + _runname + FSEP;
         s += to_string(sum_dt[p.first]) + FSEP;
 
         int N_barc1 = count_dict[b1];
@@ -1447,7 +1423,7 @@ int D2C::determineBarcodeMerge()
     bt                              = fopen(barcode_translate_file.c_str(), "w");
     for (auto& p : _drop_barcodes)
     {
-        string s = int2Barcode(p.first) + int2Runname(p.first) + "\t" + _idx2drop[p.second] + "\n";
+        string s = int2Barcode(p.first) + _runname + "\t" + _idx2drop[p.second] + "\n";
         fwrite(s.c_str(), 1, s.size(), bt);
     }
     fclose(bt);
@@ -1610,13 +1586,19 @@ int D2C::annotateBamByChr(int chr_id)
             spdlog::debug("Invalid barcode {} not exists in barcode list", bead_bc);
             continue;
         }
-        int runname = 0;
-        if (bead_bc.size() > BBLEN)
-        {
-            string tmp = bead_bc.substr(BBLEN);
-            runname    = _runname2int[tmp];
-        }
-        int barcode = (runname << BBIT * 2) + (_barcode2int[b1] << BBIT) + _barcode2int[b2];
+        // int tail = 0;
+        // if (bead_bc.size() > BBLEN)
+        // {
+        //     string tmp = bead_bc.substr(BBLEN);
+        //     if (_tail2int.count(tmp) == 0)
+        //     {
+        //         spdlog::warn("Invalid tn5 {} not exists in tn5.list", barcode);
+        //         continue;
+        //     }
+        //     tail = _tail2int[tmp];
+        // }
+        // int barcode = (tail << BBIT * 2) + (_barcode2int[b1] << BBIT) + _barcode2int[b2];
+        int barcode = (_barcode2int[b1] << BBIT) + _barcode2int[b2];
         it          = _drop_barcodes.find(barcode);
         if (it == _drop_barcodes.end())
             continue;
@@ -1956,61 +1938,79 @@ bool D2C::parseBarcodeList()
     return true;
 }
 
+bool D2C::parseTn5List()
+{
+    _tail_names.push_back("");
+    ifstream ifs(tn5_list, std::ifstream::in);
+    string   line;
+    int      pos = 1;
+    while (std::getline(ifs, line))
+    {
+        _tail_names.push_back(line);
+        _tail2int[line] = pos++;
+    }
+    // if (_tail_names.empty())
+    //     return false;
+    return true;
+}
+
 inline string D2C::int2Barcode(int i)
 {
     // spdlog::debug("i: {}", i);
-    string res = _barcode_names[(i >> BBIT) & BMASK] + _barcode_names[i & BMASK];
+    string res = _barcode_names[(i >> BBIT) & BMASK] + _barcode_names[i & BMASK] + _tail_names[(i >> BBIT * 2) & RMASK];
     return res;
 }
 
-inline string D2C::int2Runname(int i)
+inline string D2C::int2Tn5(int i)
 {
-    // spdlog::debug("i: {}", i);
-    string res = _runnames[(i >> BBIT * 2) & RMASK];
+    string res = _tail_names[(i >> BBIT * 2) & RMASK];
     return res;
 }
 
 bool D2C::parseRunnameList()
 {
-    _runnames.push_back("");
-    int pos = 1;
-    if (!barcode_runname_list.empty())
-    {
-        ifstream ifs(barcode_runname_list, std::ifstream::in);
-        string   line;
-        while (std::getline(ifs, line))
-        {
-            if (line.substr(0, 1) != BSEP)
-                line.insert(0, BSEP);
-            _runnames.push_back(line);
-            _runname2int[line] = pos++;
-        }
-    }
-    else
+    // int pos = 1;
+    // Deprecate
+    // if (!barcode_runname_list.empty())
+    // {
+    //     ifstream ifs(barcode_runname_list, std::ifstream::in);
+    //     string   line;
+    //     while (std::getline(ifs, line))
+    //     {
+    //         if (line.substr(0, 1) != BSEP)
+    //             line.insert(0, BSEP);
+    //         _runnames.push_back(line);
+    //         _runname2int[line] = pos++;
+    //     }
+    // }
+    // else
     {
         // Get run names from bam file
         if (_is_bed)
         {
-            ifstream ifs(input_bam, std::ifstream::in);
-            string   line;
-            while (std::getline(ifs, line))
-            {
-                vector< string > vec_s = split_str(line, '\t');
-                if (vec_s.size() < 4)
-                    continue;
-                
-                string& barcode = vec_s[3];
-                if (barcode.size() <= BBLEN)
-                    break;
+            // for bed, there is not exists runname in the end of barcode,
+            // but there will be 10bp tn5
 
-                string name = barcode.substr(BBLEN);
-                if (!name.empty() && _runname2int.count(name))
-                    continue;
-                _runnames.push_back(name);
-                _runname2int[name] = pos++;
-                break;
-            }
-            ifs.close();
+            // ifstream ifs(input_bam, std::ifstream::in);
+            // string   line;
+            // while (std::getline(ifs, line))
+            // {
+            //     vector< string > vec_s = split_str(line, '\t');
+            //     if (vec_s.size() < 4)
+            //         continue;
+                
+            //     string& barcode = vec_s[3];
+            //     if (barcode.size() <= BBLEN)
+            //         break;
+
+            //     string name = barcode.substr(BBLEN);
+            //     if (!name.empty() && _runname2int.count(name))
+            //         continue;
+            //     _runnames.push_back(name);
+            //     _runname2int[name] = pos++;
+            //     break;
+            // }
+            // ifs.close();
         }
         else
         {
@@ -2023,30 +2023,21 @@ bool D2C::parseRunnameList()
             {
                 if (!sr->QueryByContig(chr_id))
                     continue;
-                while (sr->next(bam_record))
+                // Users insist on not mixing multiple batches of data, so we just read one record in bam
+                if (sr->next(bam_record) && getTag(bam_record, barcode_tag.c_str(), barcode))
                 {
-                    if (getTag(bam_record, barcode_tag.c_str(), barcode))
-                    {
                         // Barcode format: bc1bc2-runname, and the size of bc1 or bc2 is 10
                         // There is exists new format without runname, only bc1bc2
                         if (barcode.size() <= BBLEN) // means no runname
-                            break;
-                        string name = barcode.substr(BBLEN);
-                        if (!name.empty() && _runname2int.count(name))
-                            continue;
-                        _runnames.push_back(name);
-                        _runname2int[name] = pos++;
-                        // Users insist on not mixing multiple batches of data, so we just read one record in bam
+                            _runname = "";
+                        else
+                            _runname = barcode.substr(BBLEN);
                         break;
-                    }
                 }
-                // Just check one chromosome, it is enough
-                if (_runnames.size() >= 1)
-                    break;
             }
             bam_destroy1(bam_record);
         }
     }
-    spdlog::debug("Barcode runname number: {}", _runnames.size() - 1);
+    spdlog::debug("Barcode runname: {}", _runname);
     return true;
 }
