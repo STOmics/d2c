@@ -65,7 +65,7 @@ private:
     int                    determineBarcodeMerge();
     int                    reannotateFragByChr(int chr_id);
     int                    annotateBamByChr(int chr_id);
-    int                    simpleQC(vector<int>& used_chrs);
+    int                    simpleQC(vector< int >& used_chrs);
     int                    finalQC();
     int                    plot();
     bool                   checkTn5(string s);
@@ -74,7 +74,7 @@ private:
     inline string          int2Barcode(int i);
     inline string          int2Tn5(int i);
     bool                   parseRunnameList();
-    bool    parseTn5List();
+    bool                   parseTn5List();
 
 private:
     // Input parameters
@@ -84,7 +84,7 @@ private:
     string   drop_tag;
     int      mapq, cores;
     string   run_name;
-    int     tn5;
+    int      tn5;
     double   min_barcode_frags, min_jaccard_index;
     string   ref;
     string   bed_genome_file, blacklist_file, trans_file;
@@ -94,12 +94,12 @@ private:
     bool     saturation_on;
     string   barcode_list;
     string   barcode_runname_list;
-    int  beads_force;
-    string tn5_list;
+    int      beads_force;
+    string   tn5_list;
 
     // for mixed species
-    string   single_mc, human_mc, mouse_mc;
-    set<string> mito_chrs;
+    string        single_mc, human_mc, mouse_mc;
+    set< string > mito_chrs;
 
     // Specific parameters;
     int      nc_threshold;  // Number of barcodes that a paired-end read must be observed for the read to be filtered
@@ -112,17 +112,18 @@ private:
     vector< vector< Bedpe > > _bedpes_by_chr;
     unordered_map< int, int > _total_bead_quant;
     // vector<string> _total_bead_order;
-    std::mutex                                _merge_chr_mutex;
-    unordered_set< int >                      _hq_beads;
-    vector< map< int, int > >                 _total_nc_cnts;
-    vector< unordered_map< size_t, int > >    _total_bead_cnts;
+    std::mutex                             _merge_chr_mutex;
+    unordered_set< int >                   _hq_beads;
+    vector< map< int, int > >              _total_nc_cnts;
+    vector< unordered_map< size_t, int > > _total_bead_cnts;
     unordered_map< int, int >              _drop_barcodes;
-    vector< string >                          _contig_names;
-    vector< vector< AnnotateFragment > >                _dup_frags;
-    vector< AnnotateFragment >                          _final_frags;
-    vector< unordered_set< int > >            _keep_qnames;
-    vector< map< string, pair< unsigned long, unsigned long > > > _frag_stats; // ulong encode two uint32, for mix species
-    vector< SumStat >                         _sum_stats;
+    vector< string >                       _contig_names;
+    vector< vector< AnnotateFragment > >   _dup_frags;
+    vector< AnnotateFragment >             _final_frags;
+    vector< unordered_set< int > >         _keep_qnames;
+    vector< map< string, pair< unsigned long, unsigned long > > >
+                      _frag_stats;  // ulong encode two uint32, for mix species
+    vector< SumStat > _sum_stats;
 
     // Instance of sequencing saturation
     Saturation saturation;
@@ -138,12 +139,12 @@ private:
     string _runname;
 
     // Index to drop barcodes, encoding barcodes to int
-    vector<string> _idx2drop;
+    vector< string > _idx2drop;
 
     // Check input file type
     bool _is_bed;
 
     // Encode tn5 sequence to integer
-    vector<string> _tail_names;
-    unordered_map<string, int> _tail2int;
+    vector< string >             _tail_names;
+    unordered_map< string, int > _tail2int;
 };

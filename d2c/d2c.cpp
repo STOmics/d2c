@@ -280,11 +280,10 @@ D2C::D2C(string input_bam, string output_path, string barcode_in_tag, string bar
          string barcode_runname_list, int beads_force, string tn5_list)
     : input_bam(input_bam), output_path(output_path), barcode_tag(barcode_in_tag), drop_tag(barcode_out_tag),
       mapq(mapq), cores(cores), run_name(run_name), tn5(tn5), min_barcode_frags(min_barcode_frags),
-      min_jaccard_index(min_jaccard_index), ref(ref), bed_genome_file(bed_genome_file),
-      blacklist_file(blacklist_file), trans_file(trans_file), species_mix(species_mix), bin_path(bin_path),
-      barcode_threshold(barcode_threshold), jaccard_threshold(jaccard_threshold), saturation_on(saturation_on),
-      barcode_list(barcode_list), barcode_runname_list(barcode_runname_list), beads_force(beads_force),
-      tn5_list(tn5_list)
+      min_jaccard_index(min_jaccard_index), ref(ref), bed_genome_file(bed_genome_file), blacklist_file(blacklist_file),
+      trans_file(trans_file), species_mix(species_mix), bin_path(bin_path), barcode_threshold(barcode_threshold),
+      jaccard_threshold(jaccard_threshold), saturation_on(saturation_on), barcode_list(barcode_list),
+      barcode_runname_list(barcode_runname_list), beads_force(beads_force), tn5_list(tn5_list)
 {
     nc_threshold         = 6;
     regularize_threshold = 4;
@@ -304,7 +303,7 @@ D2C::D2C(string input_bam, string output_path, string barcode_in_tag, string bar
     else
     {
         string chr1 = mito_chr.substr(0, pos);
-        string chr2 = mito_chr.substr(pos+1);
+        string chr2 = mito_chr.substr(pos + 1);
         if (chr1.at(0) == 'h' && chr2.at(0) == 'm')
         {
             human_mc = chr1;
@@ -348,13 +347,12 @@ int D2C::run()
     }
     // Parse tn5 list
     parseTn5List();
-        
-    // Check is make sense for mix_species and mito chrs 
-    if ((species_mix && (human_mc.empty() || mouse_mc.empty())) ||
-        (!species_mix && !human_mc.empty() && !mouse_mc.empty()))
+
+    // Check is make sense for mix_species and mito chrs
+    if ((species_mix && (human_mc.empty() || mouse_mc.empty()))
+        || (!species_mix && !human_mc.empty() && !mouse_mc.empty()))
     {
-        spdlog::warn("species_mix is {} but human_mc is {} and mouse_mc is {}", 
-                species_mix, human_mc, mouse_mc);
+        spdlog::warn("species_mix is {} but human_mc is {} and mouse_mc is {}", species_mix, human_mc, mouse_mc);
         return -2;
     }
 
@@ -383,20 +381,19 @@ int D2C::taskflow()
     if (_is_bed)
     {
         auto temp_map = parseChrsFromBedFile(input_bam);
-        for (auto& [k,_] : temp_map)
-            contigs.push_back({k, 0});
+        for (auto& [k, _] : temp_map)
+            contigs.push_back({ k, 0 });
     }
     else
     {
         auto samReader = SamReader::FromFile(input_bam);
-        contigs   = samReader->getContigs();
+        contigs        = samReader->getContigs();
     }
     spdlog::debug("Bam contigs num: {}", contigs.size());
     for (auto& p : contigs)
     {
         _contig_names.push_back(p.first);
         spdlog::debug("bam contig: {}", p.first);
-
     }
 
     // Verify that the supplied reference genome and the bam have overlapping chromosomes
@@ -407,7 +404,7 @@ int D2C::taskflow()
             bed_chrs.emplace(ctg, "");
     }
     spdlog::debug("bed_chrs num: {}", bed_chrs.size());
-    for (auto& [contig,_] : bed_chrs) 
+    for (auto& [contig, _] : bed_chrs)
         spdlog::debug("bed contig: {}", contig);
 
     vector< int > used_chrs;
@@ -431,7 +428,7 @@ int D2C::taskflow()
     _bedpes_by_chr.resize(contigs.size());
     if (_is_bed)
     {
-        map<string, int> chr_to_int;
+        map< string, int > chr_to_int;
         for (auto& id : used_chrs)
             chr_to_int[_contig_names[id]] = id;
 
@@ -446,8 +443,8 @@ int D2C::taskflow()
             if (chr_to_int.count(vec_s[0]) == 0)
                 continue;
             string& barcode = vec_s[3];
-            string b1 = barcode.substr(0, BLEN);
-            string b2 = barcode.substr(BLEN, BLEN);
+            string  b1      = barcode.substr(0, BLEN);
+            string  b2      = barcode.substr(BLEN, BLEN);
             if (_barcode2int.count(b1) == 0 || _barcode2int.count(b2) == 0)
             {
                 spdlog::warn("Invalid barcode {} not exists in barcode list", barcode);
@@ -455,8 +452,8 @@ int D2C::taskflow()
             }
 
             Bedpe bedpe;
-            bedpe.start = stoi(vec_s[1]);
-            bedpe.end   = stoi(vec_s[2]);
+            bedpe.start  = stoi(vec_s[1]);
+            bedpe.end    = stoi(vec_s[2]);
             bedpe.qname1 = 0;
             bedpe.qname2 = 0;
 
@@ -567,7 +564,7 @@ int D2C::taskflow()
     // Step 6: annotate bam file by chr
     auto [start_annobam, end_annobam] = taskflow.parallel_for(used_chrs.begin(), used_chrs.end(), [&](int chr_id) {
         // Skip the mito chrom
-        //if (_contig_names[chr_id] == mito_chr)
+        // if (_contig_names[chr_id] == mito_chr)
         //    return;
         if (_is_bed)
             return;
@@ -587,7 +584,7 @@ int D2C::taskflow()
     auto merge_bam = taskflow
                          .emplace([&]() {
                              if (_is_bed)
-                                return;
+                                 return;
 
                              Timer t;
                              spdlog::debug("Merge bam");
@@ -595,7 +592,7 @@ int D2C::taskflow()
                              for (auto& chr_id : used_chrs)
                              {
                                  // Skip the mito chrom
-                                 //if (_contig_names[chr_id] == mito_chr)
+                                 // if (_contig_names[chr_id] == mito_chr)
                                  //    continue;
                                  fs::path tmp_bam_file = temp_bam_path / (contigs[chr_id].first + ".bam");
                                  if (fs::exists(tmp_bam_file))
@@ -637,49 +634,51 @@ int D2C::taskflow()
     merge_bam.succeed(end_annobam);
 
     // Step 8: merge fragment files
-    auto merge_frags =
-        taskflow
-            .emplace([&]() {
-                spdlog::info("Reannotate frags memory(MB): {}", physical_memory_used_by_process());
-                spdlog::debug("Merge frags");
-                Timer t;
-                for (auto& chr_id : used_chrs)
-                {
-                    // Skip the mito chrom
-                    //if (_contig_names[chr_id] == mito_chr)
-                    //    continue;
-                    // spdlog::debug("final frags size: {} dup frags size: {} {}", _final_frags.size(), chr_id, _dup_frags[chr_id].size());
-                    // _final_frags.insert(_final_frags.end(), _dup_frags[chr_id].begin(), _dup_frags[chr_id].end());
-                    for (auto& frag : _dup_frags[chr_id])
-                    {
-                        // spdlog::debug("frag: {} {} {} {}", frag.start, frag.end, frag.chr_id, frag.barcode_id);
-                        _final_frags.push_back(std::move(frag));
-                    }
-                    _dup_frags[chr_id].clear();
-                    _dup_frags[chr_id].shrink_to_fit();
-                }
-                spdlog::debug("Final frags size: {}", _final_frags.size());
+    auto merge_frags = taskflow
+                           .emplace([&]() {
+                               spdlog::info("Reannotate frags memory(MB): {}", physical_memory_used_by_process());
+                               spdlog::debug("Merge frags");
+                               Timer t;
+                               for (auto& chr_id : used_chrs)
+                               {
+                                   // Skip the mito chrom
+                                   // if (_contig_names[chr_id] == mito_chr)
+                                   //    continue;
+                                   // spdlog::debug("final frags size: {} dup frags size: {} {}", _final_frags.size(),
+                                   // chr_id, _dup_frags[chr_id].size()); _final_frags.insert(_final_frags.end(),
+                                   // _dup_frags[chr_id].begin(), _dup_frags[chr_id].end());
+                                   for (auto& frag : _dup_frags[chr_id])
+                                   {
+                                       // spdlog::debug("frag: {} {} {} {}", frag.start, frag.end, frag.chr_id,
+                                       // frag.barcode_id);
+                                       _final_frags.push_back(std::move(frag));
+                                   }
+                                   _dup_frags[chr_id].clear();
+                                   _dup_frags[chr_id].shrink_to_fit();
+                               }
+                               spdlog::debug("Final frags size: {}", _final_frags.size());
 
-                fs::path out_frag_file = output_path / (run_name + FRAGMENT_FILE);
-                spdlog::debug("Dump frags to: {}", out_frag_file.string());
-                BGZF* out_frag;
-                out_frag = bgzf_open(out_frag_file.c_str(), "w");
-                for (auto& l : _final_frags)
-                {
-                    // Standardized format output, insert one column data
-                    string s = _contig_names[l.chr_id] + "\t" + to_string(l.start) + "\t" + to_string(l.end) + "\t" + _idx2drop[l.barcode_id] + "\t1\n";
-                    // spdlog::debug(s);
-                    [[maybe_unused]] auto ret = bgzf_write(out_frag, s.c_str(), s.size());
-                }
-                bgzf_close(out_frag);
-                spdlog::info("Merge frags time(s): {:.2f}", t.toc(1000));
+                               fs::path out_frag_file = output_path / (run_name + FRAGMENT_FILE);
+                               spdlog::debug("Dump frags to: {}", out_frag_file.string());
+                               BGZF* out_frag;
+                               out_frag = bgzf_open(out_frag_file.c_str(), "w");
+                               for (auto& l : _final_frags)
+                               {
+                                   // Standardized format output, insert one column data
+                                   string s = _contig_names[l.chr_id] + "\t" + to_string(l.start) + "\t"
+                                              + to_string(l.end) + "\t" + _idx2drop[l.barcode_id] + "\t1\n";
+                                   // spdlog::debug(s);
+                                   [[maybe_unused]] auto ret = bgzf_write(out_frag, s.c_str(), s.size());
+                               }
+                               bgzf_close(out_frag);
+                               spdlog::info("Merge frags time(s): {:.2f}", t.toc(1000));
 
-                if (tbx_index_build(out_frag_file.c_str(), 0, &tbx_conf_bed))
-                    spdlog::warn("Failed build frags index");
-                else
-                    spdlog::info("Build frags index time(s): {:.2f}", t.toc(1000));
-            })
-            .name("Merge fragments");
+                               if (tbx_index_build(out_frag_file.c_str(), 0, &tbx_conf_bed))
+                                   spdlog::warn("Failed build frags index");
+                               else
+                                   spdlog::info("Build frags index time(s): {:.2f}", t.toc(1000));
+                           })
+                           .name("Merge fragments");
     merge_frags.succeed(end_reanno);
 
     // Step 9: simple qc
@@ -796,7 +795,7 @@ int D2C::splitBamByChr(int chr_id)
     string         line;
     if (fs::exists(blacklist_file))
     {
-        ifstream       blf(blacklist_file, std::ifstream::in);
+        ifstream blf(blacklist_file, std::ifstream::in);
         while (std::getline(blf, line))
         {
             vector< string > vec_str = split_str(line, '\t');
@@ -968,7 +967,7 @@ int D2C::determineHQBeads()
         }
 
         min_barcode_frags = barcode_rank(cnts, INFLECTION_KERNEL_TYPE::DROPLETUTILS, CURVE_DATA_TYPE::BEAD);
-           
+
         if (beads_force != 0)
         {
             std::sort(cnts.begin(), cnts.end(), std::greater< double >());
@@ -1158,7 +1157,8 @@ bool D2C::checkTn5(size_t l)
     //     return true;
 
     string s1 = int2Barcode(int(l >> 32));
-    string s2 = int2Barcode(int(l & 0xFFFF));
+    string s2 = int2Barcode(int(l & 0xFFFFFFFF));
+    // std::cout<<s1<<" "<<s2<<" "<<substrRight(s1, tn5)<<" "<<substrRight(s2, tn5)<<endl;
     return (substrRight(s1, tn5) == substrRight(s2, tn5));
 }
 
@@ -1186,6 +1186,7 @@ int D2C::determineBarcodeMerge()
             for (auto& p : m)
             {
                 // Only consider merging when Tn5 is the same
+                // cout<<p.first<<" "<<p.second<<endl;
                 if (p.second >= regularize_threshold && checkTn5(p.first))
                     sum_dt[p.first] += p.second;
             }
@@ -1406,7 +1407,7 @@ int D2C::determineBarcodeMerge()
                     drop_barcode = run_name + ss.str();
                 else
                     drop_barcode = run_name + "_Tn5-" + substrRight(int2Barcode(b), tn5) + ss.str();
-                
+
                 if (_idx2drop.empty() || drop_barcode != _idx2drop.back())
                     _idx2drop.push_back(std::move(drop_barcode));
                 _drop_barcodes[b]     = _idx2drop.size() - 1;
@@ -1474,10 +1475,10 @@ struct cmp
 int D2C::reannotateFragByChr(int chr_id)
 {
     spp::sparse_hash_set< AnnotateFragment > pcr_dup;
-    unordered_set< int >    qname_dup;
+    unordered_set< int >                     qname_dup;
     // Store n_total and n_unique as pair
-    map< string, pair< unsigned long, unsigned long > >&                      merge_ss   = _frag_stats[chr_id];
-    string                                                chr        = _contig_names[chr_id];
+    map< string, pair< unsigned long, unsigned long > >& merge_ss = _frag_stats[chr_id];
+    string                                               chr      = _contig_names[chr_id];
     // for mix species
     unsigned long increment = 0;
     if (!species_mix)
@@ -1492,9 +1493,9 @@ int D2C::reannotateFragByChr(int chr_id)
             increment = 0x100000000;
     }
 
-    auto&                                                 frags_data = _bedpes_by_chr[chr_id];
+    auto&                                                                  frags_data = _bedpes_by_chr[chr_id];
     unordered_map< string, spp::sparse_hash_map< AnnotateFragment, int > > dups_per_cell;  // only used for saturation
-    unordered_map< int, int >::iterator                it;
+    unordered_map< int, int >::iterator                                    it;
     for (auto& bedpe : frags_data)
     {
         // Filter for eligible barcodes
@@ -1504,9 +1505,10 @@ int D2C::reannotateFragByChr(int chr_id)
             continue;
 
         string cell_barcode = _idx2drop[it->second];
-        // string s            = chr + "\t" + to_string(bedpe.start) + "\t" + to_string(bedpe.end) + "\t" + cell_barcode;
+        // string s            = chr + "\t" + to_string(bedpe.start) + "\t" + to_string(bedpe.end) + "\t" +
+        // cell_barcode;
         AnnotateFragment frag(chr_id, bedpe.start, bedpe.end, it->second);
-        auto&  p            = merge_ss[cell_barcode];
+        auto&            p = merge_ss[cell_barcode];
         if (pcr_dup.count(frag) == 0)
         {
             // spdlog::debug("frag1: {} {} {} {}", frag.start, frag.end, frag.chr_id, frag.barcode_id);
@@ -1566,8 +1568,8 @@ int D2C::annotateBamByChr(int chr_id)
     auto                 header          = sr->getHeader();
     [[maybe_unused]] int ret             = sam_hdr_write(out, header);
 
-    BamRecord                              b = bam_init1();
-    string                                 bead_bc, drop_bc;
+    BamRecord                           b = bam_init1();
+    string                              bead_bc, drop_bc;
     unordered_map< int, int >::iterator it;
     // Iterate through bam
     int line = -1;
@@ -1615,164 +1617,164 @@ int D2C::annotateBamByChr(int chr_id)
     return 0;
 }
 
-int D2C::simpleQC(vector<int>& used_chrs)
+int D2C::simpleQC(vector< int >& used_chrs)
 {
-     map< string, pair< unsigned long, unsigned long > > nuclear;
-     int single_mito_pos = -1, human_mc_pos = -1, mouse_mc_pos = -1;
-     for (auto& chr_id : used_chrs)
-     {
-         if (_contig_names[chr_id] == single_mc)
-         {
-             single_mito_pos = chr_id;
-             continue;
-         }
-         else if (_contig_names[chr_id] == human_mc)
-         {
-             human_mc_pos = chr_id;
-             continue;
-         }
-         else if (_contig_names[chr_id] == mouse_mc)
-         {
-             mouse_mc_pos = chr_id;
-             continue;
-         }
+    map< string, pair< unsigned long, unsigned long > > nuclear;
+    int                                                 single_mito_pos = -1, human_mc_pos = -1, mouse_mc_pos = -1;
+    for (auto& chr_id : used_chrs)
+    {
+        if (_contig_names[chr_id] == single_mc)
+        {
+            single_mito_pos = chr_id;
+            continue;
+        }
+        else if (_contig_names[chr_id] == human_mc)
+        {
+            human_mc_pos = chr_id;
+            continue;
+        }
+        else if (_contig_names[chr_id] == mouse_mc)
+        {
+            mouse_mc_pos = chr_id;
+            continue;
+        }
 
-         for (auto& p : _frag_stats[chr_id])
-         {
-             if (p.second.first == 0 || p.second.second == 0)
-                 continue;
-             nuclear[p.first].first += p.second.first;
-             nuclear[p.first].second += p.second.second;
-         }
-         _frag_stats[chr_id].clear();
-     }
-     if (species_mix)
-     {
-         // for mixed species, there is more values to process
-         if (human_mc_pos == -1 && mouse_mc_pos == -1)
-         {
+        for (auto& p : _frag_stats[chr_id])
+        {
+            if (p.second.first == 0 || p.second.second == 0)
+                continue;
+            nuclear[p.first].first += p.second.first;
+            nuclear[p.first].second += p.second.second;
+        }
+        _frag_stats[chr_id].clear();
+    }
+    if (species_mix)
+    {
+        // for mixed species, there is more values to process
+        if (human_mc_pos == -1 && mouse_mc_pos == -1)
+        {
             for (auto& [cell_barcode, count_pair] : nuclear)
             {
                 SumStat ss;
-                ss.drop_barcode = cell_barcode;
-                ss.mito_total = 0;
-                ss.mito_uniq = 0;
+                ss.drop_barcode     = cell_barcode;
+                ss.mito_total       = 0;
+                ss.mito_uniq        = 0;
                 ss.human_mito_total = 0;
-                ss.human_mito_uniq = 0;
+                ss.human_mito_uniq  = 0;
                 ss.mouse_mito_total = 0;
-                ss.mouse_mito_uniq = 0;
+                ss.mouse_mito_uniq  = 0;
 
                 int totalCnt, humanCnt, mouseCnt;
                 decodeSpeciesMix(count_pair.first, totalCnt, humanCnt, mouseCnt);
                 ss.nuclear_total = totalCnt;
-                ss.human_total = humanCnt;
-                ss.mouse_total = mouseCnt;
+                ss.human_total   = humanCnt;
+                ss.mouse_total   = mouseCnt;
                 decodeSpeciesMix(count_pair.second, totalCnt, humanCnt, mouseCnt);
                 ss.nuclear_uniq = totalCnt;
-                ss.human_uniq = humanCnt;
-                ss.mouse_uniq = mouseCnt;
+                ss.human_uniq   = humanCnt;
+                ss.mouse_uniq   = mouseCnt;
 
                 _sum_stats.push_back(ss);
             }
-         }
-         else
-         {
-             map< string, pair< unsigned long, unsigned long > > human_stats, mouse_stats;
-             if (human_mc_pos != -1)
-                 human_stats.swap(_frag_stats[human_mc_pos]);
-             if (mouse_mc_pos != -1)
-                 mouse_stats.swap(_frag_stats[mouse_mc_pos]);
+        }
+        else
+        {
+            map< string, pair< unsigned long, unsigned long > > human_stats, mouse_stats;
+            if (human_mc_pos != -1)
+                human_stats.swap(_frag_stats[human_mc_pos]);
+            if (mouse_mc_pos != -1)
+                mouse_stats.swap(_frag_stats[mouse_mc_pos]);
 
-             map< string, pair< unsigned long, unsigned long > >::iterator it;
-             for (auto& cb : _idx2drop)
-             {
-                 it = nuclear.find(cb);
-                 if (it == nuclear.end())
-                     continue;
+            map< string, pair< unsigned long, unsigned long > >::iterator it;
+            for (auto& cb : _idx2drop)
+            {
+                it = nuclear.find(cb);
+                if (it == nuclear.end())
+                    continue;
 
-                 SumStat ss;
-                 ss.drop_barcode  = cb;
-                 int totalCnt, humanCnt, mouseCnt;
-                 decodeSpeciesMix(it->second.first, totalCnt, humanCnt, mouseCnt);
-                 ss.nuclear_total = totalCnt;
-                 ss.human_total = humanCnt;
-                 ss.mouse_total = mouseCnt;
-                 decodeSpeciesMix(it->second.second, totalCnt, humanCnt, mouseCnt);
-                 ss.nuclear_uniq = totalCnt;
-                 ss.human_uniq = humanCnt;
-                 ss.mouse_uniq = mouseCnt;
+                SumStat ss;
+                ss.drop_barcode = cb;
+                int totalCnt, humanCnt, mouseCnt;
+                decodeSpeciesMix(it->second.first, totalCnt, humanCnt, mouseCnt);
+                ss.nuclear_total = totalCnt;
+                ss.human_total   = humanCnt;
+                ss.mouse_total   = mouseCnt;
+                decodeSpeciesMix(it->second.second, totalCnt, humanCnt, mouseCnt);
+                ss.nuclear_uniq = totalCnt;
+                ss.human_uniq   = humanCnt;
+                ss.mouse_uniq   = mouseCnt;
 
-                 it = human_stats.find(cb);
-                 if (it != human_stats.end())
-                 {
-                     decodeSpeciesMix(it->second.first, totalCnt, humanCnt, mouseCnt);
-                     ss.human_mito_total    = totalCnt;
-                     decodeSpeciesMix(it->second.second, totalCnt, humanCnt, mouseCnt);
-                     ss.human_mito_uniq     = totalCnt;
-                 }
+                it = human_stats.find(cb);
+                if (it != human_stats.end())
+                {
+                    decodeSpeciesMix(it->second.first, totalCnt, humanCnt, mouseCnt);
+                    ss.human_mito_total = totalCnt;
+                    decodeSpeciesMix(it->second.second, totalCnt, humanCnt, mouseCnt);
+                    ss.human_mito_uniq = totalCnt;
+                }
 
-                 it = mouse_stats.find(cb);
-                 if (it != mouse_stats.end())
-                 {
-                     decodeSpeciesMix(it->second.first, totalCnt, humanCnt, mouseCnt);
-                     ss.mouse_mito_total     = totalCnt;
-                     decodeSpeciesMix(it->second.second, totalCnt, humanCnt, mouseCnt);
-                     ss.mouse_mito_uniq     = totalCnt;
-                 }
+                it = mouse_stats.find(cb);
+                if (it != mouse_stats.end())
+                {
+                    decodeSpeciesMix(it->second.first, totalCnt, humanCnt, mouseCnt);
+                    ss.mouse_mito_total = totalCnt;
+                    decodeSpeciesMix(it->second.second, totalCnt, humanCnt, mouseCnt);
+                    ss.mouse_mito_uniq = totalCnt;
+                }
 
-                 ss.mito_total    = ss.human_mito_total + ss.mouse_mito_total;
-                 ss.mito_uniq     = ss.human_mito_uniq + ss.mouse_mito_uniq;
+                ss.mito_total = ss.human_mito_total + ss.mouse_mito_total;
+                ss.mito_uniq  = ss.human_mito_uniq + ss.mouse_mito_uniq;
 
-                 _sum_stats.push_back(ss);
-             }
-         }
-     }
-     else
-     {
-         // No mito found
-         // Stay useful infomation except mito
-         if (single_mito_pos == -1)
-         {
+                _sum_stats.push_back(ss);
+            }
+        }
+    }
+    else
+    {
+        // No mito found
+        // Stay useful infomation except mito
+        if (single_mito_pos == -1)
+        {
             for (auto& [cell_barcode, count_pair] : nuclear)
             {
                 SumStat ss;
-                ss.drop_barcode = cell_barcode;
-                ss.mito_total = 0;
-                ss.mito_uniq = 0;
+                ss.drop_barcode  = cell_barcode;
+                ss.mito_total    = 0;
+                ss.mito_uniq     = 0;
                 ss.nuclear_total = count_pair.first;
                 ss.nuclear_uniq  = count_pair.second;
 
                 _sum_stats.push_back(ss);
             }
-         }
-         else
-         {
-             auto&                                     mito = _frag_stats[single_mito_pos];
-             map< string, pair< unsigned long, unsigned long > >::iterator it;
-             for (auto& cb : _idx2drop)
-             {
-                 it = nuclear.find(cb);
-                 if (it == nuclear.end())
-                     continue;
+        }
+        else
+        {
+            auto&                                                         mito = _frag_stats[single_mito_pos];
+            map< string, pair< unsigned long, unsigned long > >::iterator it;
+            for (auto& cb : _idx2drop)
+            {
+                it = nuclear.find(cb);
+                if (it == nuclear.end())
+                    continue;
 
-                 SumStat ss;
-                 ss.drop_barcode  = cb;
-                 ss.nuclear_total = it->second.first;
-                 ss.nuclear_uniq  = it->second.second;
-                 if (mito.count(cb))
-                 {
-                     ss.mito_total    = mito[cb].first;
-                     ss.mito_uniq     = mito[cb].second;
-                 }
-                 else
-                 {
-                     ss.mito_total    = 0;
-                     ss.mito_uniq     = 0;
-                 }
-                 _sum_stats.push_back(ss);
-             }
-         }
-     }
+                SumStat ss;
+                ss.drop_barcode  = cb;
+                ss.nuclear_total = it->second.first;
+                ss.nuclear_uniq  = it->second.second;
+                if (mito.count(cb))
+                {
+                    ss.mito_total = mito[cb].first;
+                    ss.mito_uniq  = mito[cb].second;
+                }
+                else
+                {
+                    ss.mito_total = 0;
+                    ss.mito_uniq  = 0;
+                }
+                _sum_stats.push_back(ss);
+            }
+        }
+    }
     return 0;
 }
 
@@ -1843,9 +1845,8 @@ int D2C::finalQC()
         //                  sd.insert_size.end());
         // sd.median_insert_size = *(sd.insert_size.begin() + int(0.5 * sd.insert_size.size()));
         // sd.frip               = 0;
-        sd.tss_proportion     = sd.overlaps * 1.0 / sd.insert_size.size();
+        sd.tss_proportion = sd.overlaps * 1.0 / sd.insert_size.size();
     }
-
 
     for (auto& l : _sum_stats)
     {
@@ -1870,11 +1871,12 @@ int D2C::finalQC()
     FILE*    qc_out;
     fs::path out_qc_file = output_path / (run_name + QC_STATS_FILE);
     qc_out               = fopen(out_qc_file.c_str(), "w");
-    string header =
-        "CellBarcode\ttotalFrags\tuniqueFrags\ttotalMitoFrags\tuniqueMitoFrags\tduplicateProportion\ttssProportion\tMitoProportion\n";
+    string header = "CellBarcode\ttotalFrags\tuniqueFrags\ttotalMitoFrags\tuniqueMitoFrags\tduplicateProportion\ttssPro"
+                    "portion\tMitoProportion\n";
     if (species_mix)
-        header =
-        "CellBarcode\ttotalFrags\tuniqueFrags\ttotalMitoFrags\tuniqueMitoFrags\ttotalHumanMitoFrags\tuniqHumanMitoFrags\ttotalMouseMitoFrags\tuniqMouseMitoFrags\ttotalHumanFrags\tuniqueHumanFrags\ttotalMouseFrags\tuniqueMouseFrags\tduplicateProportion\ttssProportion\tMitoProportion\n";
+        header = "CellBarcode\ttotalFrags\tuniqueFrags\ttotalMitoFrags\tuniqueMitoFrags\ttotalHumanMitoFrags\tuniqHuman"
+                 "MitoFrags\ttotalMouseMitoFrags\tuniqMouseMitoFrags\ttotalHumanFrags\tuniqueHumanFrags\ttotalMouseFrag"
+                 "s\tuniqueMouseFrags\tduplicateProportion\ttssProportion\tMitoProportion\n";
 
     fwrite(header.c_str(), 1, header.size(), qc_out);
     map< string, SummaryData >::iterator it;
@@ -1884,18 +1886,18 @@ int D2C::finalQC()
         if (it == summary.end())
             continue;
 
-        auto& sd = it->second;
-        string s = l.drop_barcode + FSEP + to_string(l.nuclear_total) + FSEP + to_string(l.nuclear_uniq) + FSEP
+        auto&  sd = it->second;
+        string s  = l.drop_barcode + FSEP + to_string(l.nuclear_total) + FSEP + to_string(l.nuclear_uniq) + FSEP
                    + to_string(l.mito_total) + FSEP + to_string(l.mito_uniq) + FSEP;
 
         if (species_mix)
             s += to_string(l.human_mito_total) + FSEP + to_string(l.human_mito_uniq) + FSEP
-                 + to_string(l.mouse_mito_total) + FSEP + to_string(l.mouse_mito_uniq) + FSEP
-                 + to_string(l.human_total) + FSEP + to_string(l.human_uniq) + FSEP
-                 + to_string(l.mouse_total) + FSEP + to_string(l.mouse_uniq) + FSEP;
+                 + to_string(l.mouse_mito_total) + FSEP + to_string(l.mouse_mito_uniq) + FSEP + to_string(l.human_total)
+                 + FSEP + to_string(l.human_uniq) + FSEP + to_string(l.mouse_total) + FSEP + to_string(l.mouse_uniq)
+                 + FSEP;
 
-        s += f2str(l.dup_proportion, 4) + FSEP
-             + f2str(sd.tss_proportion, 4) + FSEP + f2str((l.mito_uniq * 1.0) / l.nuclear_uniq, 4) + "\n";
+        s += f2str(l.dup_proportion, 4) + FSEP + f2str(sd.tss_proportion, 4) + FSEP
+             + f2str((l.mito_uniq * 1.0) / l.nuclear_uniq, 4) + "\n";
         fwrite(s.c_str(), 1, s.size(), qc_out);
     }
     fclose(qc_out);
@@ -1998,7 +2000,7 @@ bool D2C::parseRunnameList()
             //     vector< string > vec_s = split_str(line, '\t');
             //     if (vec_s.size() < 4)
             //         continue;
-                
+
             //     string& barcode = vec_s[3];
             //     if (barcode.size() <= BBLEN)
             //         break;
@@ -2026,13 +2028,13 @@ bool D2C::parseRunnameList()
                 // Users insist on not mixing multiple batches of data, so we just read one record in bam
                 if (sr->next(bam_record) && getTag(bam_record, barcode_tag.c_str(), barcode))
                 {
-                        // Barcode format: bc1bc2-runname, and the size of bc1 or bc2 is 10
-                        // There is exists new format without runname, only bc1bc2
-                        if (barcode.size() <= BBLEN) // means no runname
-                            _runname = "";
-                        else
-                            _runname = barcode.substr(BBLEN);
-                        break;
+                    // Barcode format: bc1bc2-runname, and the size of bc1 or bc2 is 10
+                    // There is exists new format without runname, only bc1bc2
+                    if (barcode.size() <= BBLEN)  // means no runname
+                        _runname = "";
+                    else
+                        _runname = barcode.substr(BBLEN);
+                    break;
                 }
             }
             bam_destroy1(bam_record);

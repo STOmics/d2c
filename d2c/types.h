@@ -35,8 +35,10 @@ struct UniqBarcode
 
 struct AnnotateFragment
 {
-    AnnotateFragment(int _chr_id, int _start, int _end, int _barcode_id):
-        chr_id(_chr_id), start(_start), end(_end), barcode_id(_barcode_id) {}
+    AnnotateFragment(int _chr_id, int _start, int _end, int _barcode_id)
+        : chr_id(_chr_id), start(_start), end(_end), barcode_id(_barcode_id)
+    {
+    }
     bool operator==(const AnnotateFragment& o) const
     {
         return start == o.start && end == o.end && chr_id == o.chr_id && barcode_id == o.barcode_id;

@@ -24,15 +24,15 @@ namespace fs = std::filesystem;
 
 #include <CLI11.hpp>
 
-#include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/spdlog.h>
 
 #include "timer.h"
 
 //#define DEVEL
 constexpr auto APP_NAME    = "D2C";
-constexpr auto APP_VERSION = "1.4.5";
+constexpr auto APP_VERSION = "1.4.6";
 
 int main(int argc, char** argv)
 {
@@ -71,12 +71,15 @@ int main(int argc, char** argv)
     string barcode_list = (exe_path / "barcode.list").string();
     sub_count->add_option("-b", barcode_list, "Barcode list file")->check(CLI::ExistingFile);
     string tn5_list = (exe_path / "tn5.list").string();
-    int mapq = 30;
+    int    mapq     = 30;
     sub_count->add_option("--mapq", mapq, "Filter thrshold of mapping quality, default 30");
     int cores = std::thread::hardware_concurrency();
     sub_count->add_option("-c", cores, "CPU core number, default detect")->check(CLI::PositiveNumber);
     int tn5 = 0;
-    sub_count->add_option("--tn5", tn5, "Process data knowing that the barcodes were generated with a barcoded Tn5, default 0")->check(CLI::NonNegativeNumber);
+    sub_count
+        ->add_option("--tn5", tn5,
+                     "Process data knowing that the barcodes were generated with a barcoded Tn5, default 0")
+        ->check(CLI::NonNegativeNumber);
     double min_barcode_frags = 0.0;
     sub_count->add_option("--bf", min_barcode_frags,
                           "Minimum number of fragments to be thresholded for doublet merging");
@@ -101,7 +104,9 @@ int main(int argc, char** argv)
         ->check(CLI::PositiveNumber);
 
     int beads_force = 0;
-    sub_count->add_option("--fb", beads_force, "Top N number of fragments to be thresholded when calculated threshold is too large")
+    sub_count
+        ->add_option("--fb", beads_force,
+                     "Top N number of fragments to be thresholded when calculated threshold is too large")
         ->check(CLI::NonNegativeNumber);
 
     int jaccard_threshold = 0;
@@ -112,7 +117,6 @@ int main(int argc, char** argv)
 
     bool saturation_on = false;
     sub_count->add_flag("--sat", saturation_on, "Output sequencing saturation file, default False");
-
 
     bool species_mix = false;
     sub_count->add_flag("--mix-species", species_mix, "Set species mixed, default False");
@@ -137,10 +141,10 @@ int main(int argc, char** argv)
     {
         // auto file_logger = spdlog::basic_logger_mt("main", "logs/" + ostr.str());
         fs::path fs_log_path(log_path);
-        auto     file_sink      = std::make_shared< spdlog::sinks::basic_file_sink_mt >(fs_log_path / ostr.str());
-        auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-        std::vector<spdlog::sink_ptr> sinks {console_sink, file_sink};
-        auto logger = std::make_shared<spdlog::logger>("d2c", sinks.begin(), sinks.end());
+        auto     file_sink    = std::make_shared< spdlog::sinks::basic_file_sink_mt >(fs_log_path / ostr.str());
+        auto     console_sink = std::make_shared< spdlog::sinks::stdout_color_sink_mt >();
+        std::vector< spdlog::sink_ptr > sinks{ console_sink, file_sink };
+        auto                            logger = std::make_shared< spdlog::logger >("d2c", sinks.begin(), sinks.end());
         spdlog::register_logger(logger);
         spdlog::set_default_logger(logger);
     }
@@ -187,7 +191,7 @@ int main(int argc, char** argv)
         // Handle reference genome
         if (supported_genomes.count(ref) != 0)
         {
-            spdlog::info("Found designated reference genome: {}",ref);
+            spdlog::info("Found designated reference genome: {}", ref);
             if (trans_file.empty())
                 trans_file = ref_path / "TSS" / (ref + ".refGene.TSS.bed");
             if (blacklist_file.empty())
@@ -239,14 +243,14 @@ int main(int argc, char** argv)
             species_mix = true;
 
         spdlog::info("{} input_bam:{} output_path:{} barcode_in_tag:{} barcode_out_tag:{} "
-                                  "mapq:{} cores:{} run_name:{} tn5:{} min_barcode_frags:{} min_jaccard_index:{} "
-                                  "ref:{} mito_chr:{} bed_genome_file:{} blacklist_file:{} trans_file:{} "
-                                  "species_mix:{} barcode_threshold:{} jaccard_threshold:{} saturation_on:{} "
-                                  "barcode_list:{} barcode_runname_list:{} beads_force:{} tn5_list:{}",
-                                  argv[0], input_bam, output_path, barcode_in_tag, barcode_out_tag, mapq, cores,
-                                  run_name, tn5, min_barcode_frags, min_jaccard_index, ref, mito_chr, bed_genome_file,
-                                  blacklist_file, trans_file, species_mix, barcode_threshold, jaccard_threshold,
-                                  saturation_on, barcode_list, barcode_runname_list, beads_force, tn5_list);
+                     "mapq:{} cores:{} run_name:{} tn5:{} min_barcode_frags:{} min_jaccard_index:{} "
+                     "ref:{} mito_chr:{} bed_genome_file:{} blacklist_file:{} trans_file:{} "
+                     "species_mix:{} barcode_threshold:{} jaccard_threshold:{} saturation_on:{} "
+                     "barcode_list:{} barcode_runname_list:{} beads_force:{} tn5_list:{}",
+                     argv[0], input_bam, output_path, barcode_in_tag, barcode_out_tag, mapq, cores, run_name, tn5,
+                     min_barcode_frags, min_jaccard_index, ref, mito_chr, bed_genome_file, blacklist_file, trans_file,
+                     species_mix, barcode_threshold, jaccard_threshold, saturation_on, barcode_list,
+                     barcode_runname_list, beads_force, tn5_list);
 
         D2C d2c = D2C(input_bam, output_path, barcode_in_tag, barcode_out_tag, mapq, cores, run_name, tn5,
                       min_barcode_frags, min_jaccard_index, ref, mito_chr, bed_genome_file, blacklist_file, trans_file,

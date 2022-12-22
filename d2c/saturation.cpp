@@ -74,7 +74,7 @@ int Saturation::calculateSaturation(string out_file)
     for (size_t i = 1; i < _samples.size(); ++i)
     {
         spdlog::info("Saturation sample:{}", _samples[i]);
-        ss <<"\n"<< _samples[i] << "\t";
+        ss << "\n" << _samples[i] << "\t";
 
         size_t size = size_t(_samples[i] * _nreads);
         for (; p < size; ++p)

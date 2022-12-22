@@ -61,7 +61,7 @@ double inflection(vector< double >& vec, double lower, double exclude_from)
     int min_pos = std::distance(d1n.begin(), min_iter) - 1;
 
     double inflection = 0;
-    if (min_pos >= 0 && min_pos < static_cast<int>(stuff.size()))
+    if (min_pos >= 0 && min_pos < static_cast< int >(stuff.size()))
         inflection = pow(10, stuff[min_pos].second);
 
     return inflection;

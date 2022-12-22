@@ -113,8 +113,8 @@ size_t physical_memory_used_by_process()
 bool check_file_older(const std::string& first, const std::string& second)
 {
     fs::path p1(first), p2(second);
-    auto t1 = fs::last_write_time(p1);
-    auto t2 = fs::last_write_time(p2);
+    auto     t1 = fs::last_write_time(p1);
+    auto     t2 = fs::last_write_time(p2);
 
-    return (std::chrono::duration_cast<std::chrono::seconds>(t1 - t2).count() <= 0);
+    return (std::chrono::duration_cast< std::chrono::seconds >(t1 - t2).count() <= 0);
 }
