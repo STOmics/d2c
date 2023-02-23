@@ -31,9 +31,9 @@ double barcode_rank(vector< double >& input, INFLECTION_KERNEL_TYPE inflection_k
     else if (inflection_kernel_type == INFLECTION_KERNEL_TYPE::DROPLETUTILS)
     {
         if (curve_data_type == CURVE_DATA_TYPE::BEAD)
-            return inflection(input, 500);
+            return inflection(input, 500, true);
         else if (curve_data_type == CURVE_DATA_TYPE::JACCARD)
-            return inflection(input, 0.005);
+            return inflection(input, 0.005, false);
         else
             throw std::runtime_error("Error curve data type: " + to_string(curve_data_type));
     }

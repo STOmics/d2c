@@ -17,4 +17,4 @@ using namespace std;
 // Run-length encode
 void rle(vector< double >& vec, double thre, vector< pair< double, double > >& encodes);
 
-double inflection(vector< double >& vec, double lower = 500, double exclude_from = 50);
+double inflection(vector< double >& vec, double lower = 500, double exclude_from = 50, bool cut = false);

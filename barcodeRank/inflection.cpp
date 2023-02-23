@@ -16,7 +16,7 @@
 
 #include <cmath>
 
-double inflection(vector< double >& vec, double lower, double exclude_from)
+double inflection(vector< double >& vec, double lower, double exclude_from, bool cut)
 {
     exclude_from = log10(exclude_from);
 
@@ -56,9 +56,26 @@ double inflection(vector< double >& vec, double lower, double exclude_from)
                               [&](const pair< double, double >& p) { return (p.first <= exclude_from); });
     int skip  = min(int(d1n.size() - 1), count);
 
-    auto min_iter = std::min_element(d1n.begin() + skip, d1n.end());
-    // The first element in diff/d1n is empty
-    int min_pos = std::distance(d1n.begin(), min_iter) - 1;
+    
+    int min_pos = -1;
+    if (cut)
+    {
+        double min_val = 65535.0;
+        for (int i = skip; i < d1n.size(); ++i)
+        {
+            if (min_val > fabs(d1n[i]+1))
+            {
+                min_val = fabs(d1n[i]+1);
+                min_pos = i+1;
+            }
+        }
+    }
+    else
+    {
+        auto min_iter = std::min_element(d1n.begin() + skip, d1n.end());
+        // The first element in diff/d1n is empty
+        min_pos = std::distance(d1n.begin(), min_iter) - 1;
+    }
 
     double inflection = 0;
     if (min_pos >= 0 && min_pos < static_cast< int >(stuff.size()))
