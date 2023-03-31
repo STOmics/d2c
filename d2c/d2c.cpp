@@ -388,6 +388,18 @@ int D2C::taskflow()
     {
         auto samReader = SamReader::FromFile(input_bam);
         contigs        = samReader->getContigs();
+        BamRecord b    = bam_init1();
+        samReader->QueryOne(b);
+        string qname = getQname(b);
+        spdlog::debug("qname: {}", qname);
+
+        string suffix = qname.substr(qname.size() - 2);
+        if (suffix == "/1" || suffix == "/2")
+        {
+            spdlog::debug("Bam has suffix: {}", suffix);
+            bam_has_suffix = true;
+        }
+        bam_destroy1(b);
     }
     spdlog::debug("Bam contigs num: {}", contigs.size());
     for (auto& p : contigs)
@@ -768,7 +780,11 @@ int D2C::splitBamByChr(int chr_id)
             BamRecord b = bam_init1();
             bam_copy1(b, bam_record);
             string qname = getQname(b);
-            it           = pe_dict.find(qname);
+            if (bam_has_suffix)
+            {
+                qname = qname.substr(0, qname.size() - 2);
+            }
+            it = pe_dict.find(qname);
             if (it == pe_dict.end())
             {
                 pe_dict[qname] = { b, pos };

@@ -48,6 +48,7 @@ public:
     bool next(BamRecord b);
     bool next(BamRecord b, hts_itr_t*& iter);
     bool next(BamRecord b, int flag);
+    int  QueryOne(BamRecord b);
 
     void setThreadPool(htsThreadPool* p);
 

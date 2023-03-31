@@ -1,6 +1,6 @@
 
 # TODO: change the libPath to your specific path
-libPath="/ldfssz1/ST_BI/USER/zhaofuxiang/lib"
+libPath="/ldfssz1/ST_BIOINTEL/P20Z10200N0039/zhaofuxiang/lib"
 
 cmakePath="$libPath/cmake-3.17.2"
 gccPath="$libPath/gcc-9.1.0"

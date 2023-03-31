@@ -133,6 +133,24 @@ bool SamReader::next(BamRecord b, int flag)
     return false;
 }
 
+int SamReader::QueryOne(BamRecord b)
+{
+    for (size_t i = 0; i < ref_.size(); ++i)
+    {
+        hts_itr_t* iter = sam_itr_queryi(idx_, i, 0, ref_[i].second);
+        if (iter == nullptr)
+        {
+            spdlog::warn("query unknown reference:{}", ref_[i].first);
+            continue;
+        }
+        if (sam_itr_next(fp_, iter, b) > 0)
+        {
+            break;
+        }
+    }
+    return 0;
+}
+
 SamReader::SamReader(htsFile* fp, bam_hdr_t* header, hts_idx_t* idx) : fp_(fp), header_(header), idx_(idx)
 {
     iter_ = nullptr;

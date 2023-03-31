@@ -147,4 +147,7 @@ private:
     // Encode tn5 sequence to integer
     vector< string >             _tail_names;
     unordered_map< string, int > _tail2int;
+
+    // Support qname format of chromap: has suffix /1 /2
+    bool bam_has_suffix = false;
 };
