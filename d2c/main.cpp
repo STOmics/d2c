@@ -121,6 +121,10 @@ int main(int argc, char** argv)
     bool species_mix = false;
     sub_count->add_flag("--mix-species", species_mix, "Set species mixed, default False");
 
+    string rank = "knee";
+    sub_count->add_option("--rank", rank, "Rank method, support knee/inflection/kde, default knee")
+        ->check(CLI::IsMember({"knee", "inflection"}));
+
     string barcode_runname_list = "";
     // app.add_option("--br", barcode_runname_list, "Barcode runname list file, default
     // detect")->check(CLI::ExistingFile);
@@ -246,16 +250,16 @@ int main(int argc, char** argv)
                      "mapq:{} cores:{} run_name:{} tn5:{} min_barcode_frags:{} min_jaccard_index:{} "
                      "ref:{} mito_chr:{} bed_genome_file:{} blacklist_file:{} trans_file:{} "
                      "species_mix:{} barcode_threshold:{} jaccard_threshold:{} saturation_on:{} "
-                     "barcode_list:{} barcode_runname_list:{} beads_force:{} tn5_list:{}",
+                     "barcode_list:{} barcode_runname_list:{} beads_force:{} tn5_list:{} rank:{}",
                      argv[0], input_bam, output_path, barcode_in_tag, barcode_out_tag, mapq, cores, run_name, tn5,
                      min_barcode_frags, min_jaccard_index, ref, mito_chr, bed_genome_file, blacklist_file, trans_file,
                      species_mix, barcode_threshold, jaccard_threshold, saturation_on, barcode_list,
-                     barcode_runname_list, beads_force, tn5_list);
+                     barcode_runname_list, beads_force, tn5_list, rank);
 
         D2C d2c = D2C(input_bam, output_path, barcode_in_tag, barcode_out_tag, mapq, cores, run_name, tn5,
                       min_barcode_frags, min_jaccard_index, ref, mito_chr, bed_genome_file, blacklist_file, trans_file,
                       species_mix, exe_path.string(), barcode_threshold, jaccard_threshold, saturation_on, barcode_list,
-                      barcode_runname_list, beads_force, tn5_list);
+                      barcode_runname_list, beads_force, tn5_list, rank);
         try
         {
             d2c.run();

@@ -17,9 +17,7 @@ project(D2C)
 
 if ( UNITTEST STREQUAL "OFF" )
     # the main project
-    add_subdirectory(barcodeRank)
     add_subdirectory(d2c)
-    add_dependencies(app barcodeRank)
     message(STATUS "Compile D2C")
 else()
     # the unittest project

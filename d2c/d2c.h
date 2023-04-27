@@ -50,7 +50,7 @@ public:
         string run_name, int tn5, double min_barcode_frags, double min_jaccard_index, string ref, string mito_chr,
         string bed_genome_file, string blacklist_file, string trans_file, bool species_mix, string bin_path,
         int barcode_threshold, int jaccard_threshold, bool saturation_on, string barcode_list,
-        string barcode_runname_list, int beads_force, string tn5_list);
+        string barcode_runname_list, int beads_force, string tn5_list, string rank);
     ~D2C(){};
     int run();
     int taskflow();
@@ -75,6 +75,8 @@ private:
     inline string          int2Tn5(int i);
     bool                   parseRunnameList();
     bool                   parseTn5List();
+    double                 barcodeRank(string filename, string rank_type, string outfile);
+
 
 private:
     // Input parameters
@@ -96,6 +98,7 @@ private:
     string   barcode_runname_list;
     int      beads_force;
     string   tn5_list;
+    string   rank;
 
     // for mixed species
     string        single_mc, human_mc, mouse_mc;

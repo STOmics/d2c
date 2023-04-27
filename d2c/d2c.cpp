@@ -8,8 +8,6 @@
  */
 
 #include "d2c.h"
-#include "barcodeRank/barcodeRank.h"
-
 #include "bamCat.h"
 #include "gzIO.h"
 #include "timer.h"
@@ -47,6 +45,7 @@ constexpr int RMASK = 0xFF;      // mask for get runname value
 
 // Filenames
 constexpr auto PLOT_SCRIPT = "plot.pyc";
+constexpr auto R_SCRIPT = "rank.R";
 // constexpr auto BEAD_THRE_SCRIPT         = "10b_knee_execute.R";
 // constexpr auto JACCARD_THRE_SCRIPT      = "11b_knee_execute.R";
 constexpr auto PARAM_FILE    = ".d2cCutoff.tsv";
@@ -57,6 +56,7 @@ constexpr auto BARCODE_QUANT_FILE = ".barcodeCount.tsv";
 // constexpr auto HQ_BEADS_FILE            = ".HQbeads.tsv";
 // constexpr auto JACCARD_TMP_FILE         = ".jaccard.csv";
 constexpr auto IMPLICATED_BARCODES_FILE = ".CorrelationBarcodes.tsv.gz";
+constexpr auto TEMP_JACCARD_FILE = ".tempJaccard.tsv";
 constexpr auto BARCODE_TRANSLATE_FILE   = ".barcodeMerge.tsv";
 // constexpr auto NC_STATS_FILE            = ".NCsumstats.tsv";
 constexpr auto QC_STATS_FILE = ".Metadata.tsv";
@@ -277,13 +277,13 @@ D2C::D2C(string input_bam, string output_path, string barcode_in_tag, string bar
          string run_name, int tn5, double min_barcode_frags, double min_jaccard_index, string ref, string mito_chr,
          string bed_genome_file, string blacklist_file, string trans_file, bool species_mix, string bin_path,
          int barcode_threshold, int jaccard_threshold, bool saturation_on, string barcode_list,
-         string barcode_runname_list, int beads_force, string tn5_list)
+         string barcode_runname_list, int beads_force, string tn5_list, string rank)
     : input_bam(input_bam), output_path(output_path), barcode_tag(barcode_in_tag), drop_tag(barcode_out_tag),
       mapq(mapq), cores(cores), run_name(run_name), tn5(tn5), min_barcode_frags(min_barcode_frags),
       min_jaccard_index(min_jaccard_index), ref(ref), bed_genome_file(bed_genome_file), blacklist_file(blacklist_file),
       trans_file(trans_file), species_mix(species_mix), bin_path(bin_path), barcode_threshold(barcode_threshold),
       jaccard_threshold(jaccard_threshold), saturation_on(saturation_on), barcode_list(barcode_list),
-      barcode_runname_list(barcode_runname_list), beads_force(beads_force), tn5_list(tn5_list)
+      barcode_runname_list(barcode_runname_list), beads_force(beads_force), tn5_list(tn5_list), rank(rank)
 {
     nc_threshold         = 6;
     regularize_threshold = 4;
@@ -955,8 +955,7 @@ int D2C::determineHQBeads()
 
     // Calculate bead threshold
     fs::path paras_file = output_path / (run_name + PARAM_FILE);
-    ofstream ofs(paras_file.string(), std::ofstream::out);
-    ofs.precision(15);
+    
     if (barcode_threshold > 0)
     {
         // Use the top N parameter first
@@ -982,7 +981,7 @@ int D2C::determineHQBeads()
             cnts.push_back(b.second);
         }
 
-        min_barcode_frags = barcode_rank(cnts, INFLECTION_KERNEL_TYPE::DROPLETUTILS, CURVE_DATA_TYPE::BEAD);
+        min_barcode_frags = barcodeRank(filename.string(), rank, paras_file.string());
 
         if (beads_force != 0)
         {
@@ -990,12 +989,18 @@ int D2C::determineHQBeads()
             int tmp = beads_force <= static_cast< int >(cnts.size()) ? cnts[beads_force - 1] : cnts.back();
             spdlog::debug("bead_force_frags: {} min_barcode_frags: {}", tmp, min_barcode_frags);
             if (min_barcode_frags < tmp)
+            {
                 min_barcode_frags = tmp;
+
+                ofstream ofs(paras_file.string(), std::ofstream::out);
+                ofs.precision(15);
+                ofs << "bead_cutoff" << FSEP << min_barcode_frags << endl;
+                ofs.close();
+            }
         }
     }
 
-    ofs << "bead_cutoff" << FSEP << min_barcode_frags << endl;
-    ofs.close();
+    
 
     // Do the filter
     for (auto& p : _total_bead_quant)
@@ -1270,9 +1275,6 @@ int D2C::determineBarcodeMerge()
               [](const pair< size_t, float >& a, const pair< size_t, float >& b) { return a.second > b.second; });
 
     fs::path paras_file = output_path / (run_name + PARAM_FILE);
-    ofstream ofs(paras_file.string(), std::ofstream::out | std::ofstream::app);
-    ofs.precision(15);
-
     if (jaccard_threshold > 0)
     {
         // Use the top N parameter first
@@ -1294,18 +1296,21 @@ int D2C::determineBarcodeMerge()
     else
     {
         // Calculate the inflection point as default
-        vector< double > cnts;
-        int              size = min(1000000, int(ovdf.size()));
+        fs::path temp_path = output_path / (run_name + TEMP_JACCARD_FILE);
+
+        ofstream ofs(temp_path.string(), std::ofstream::out);
+        ofs << "jaccard_distance" << endl;
+        int size = min(1000000, int(ovdf.size()));
         for (int i = 0; i < size; ++i)
         {
-            cnts.push_back(ovdf[i].second);
+            ofs << ovdf[i].second << endl;
         }
+        ofs.close();
 
-        min_jaccard_index = barcode_rank(cnts, INFLECTION_KERNEL_TYPE::DROPLETUTILS, CURVE_DATA_TYPE::JACCARD);
+        min_jaccard_index = barcodeRank(temp_path.string(), rank, paras_file.string());
+        fs::remove(temp_path);
     }
 
-    ofs << "cor_cutoff" << FSEP << min_jaccard_index << endl;
-    ofs.close();
     spdlog::debug("cor cutoff: {}", min_jaccard_index);
 
     spdlog::debug("determineBarcodeMerge memory(MB): {}", physical_memory_used_by_process());
@@ -2058,4 +2063,37 @@ bool D2C::parseRunnameList()
     }
     spdlog::debug("Barcode runname: {}", _runname);
     return true;
+}
+
+double D2C::barcodeRank(string filename, string rank_type, string outfile)
+{
+    // Run Rscript to get knee or inflection
+    fs::path script_path = bin_path / R_SCRIPT;
+    string command = "Rscript " + script_path.string() + " -i " + filename + " -t " + rank_type + " -o " + outfile + " 2>&1";
+    vector< string > cmd_result;
+    int              cmd_rtn = exec_shell(command.c_str(), cmd_result);
+    for (const auto& line : cmd_result)
+        if (!line.empty())
+            spdlog::info(line);
+    if (cmd_rtn == 0)
+        spdlog::info("Rscript run success");
+    else
+    {
+        spdlog::error("Rscript run fail, rtn:{}", cmd_rtn);
+        throw std::runtime_error("Rscript failed. Please check if Rscript in your $PATH.");
+    }
+
+    // Parse result of Rscript
+    double res = 0;
+    ifstream ifs(outfile, std::ifstream::in);
+    string   line;
+    while (std::getline(ifs, line))
+    {
+        vector< string > vec_s = split_str(line, '\t');
+        if (vec_s.size() != 2)
+            continue;
+        res = std::stod(vec_s[1]);
+    }
+
+    return res;
 }

@@ -125,6 +125,7 @@ cp -R $srcPath/CHANGELOG.md $installPath/bin/
 # compile py code
 $py -m py_compile $srcPath/d2c/plot.py
 cp $srcPath/d2c/__pycache__/plot*.pyc $installPath/bin/plot.pyc
+cp $srcPath/d2c/rank.R $installPath/bin/
 
 cd $srcPath
 cp -R $installPath $srcPath
