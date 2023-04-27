@@ -45,7 +45,7 @@ constexpr int RMASK = 0xFF;      // mask for get runname value
 
 // Filenames
 constexpr auto PLOT_SCRIPT = "plot.pyc";
-constexpr auto R_SCRIPT = "rank.R";
+constexpr auto R_SCRIPT    = "rank.R";
 // constexpr auto BEAD_THRE_SCRIPT         = "10b_knee_execute.R";
 // constexpr auto JACCARD_THRE_SCRIPT      = "11b_knee_execute.R";
 constexpr auto PARAM_FILE    = ".d2cCutoff.tsv";
@@ -56,7 +56,7 @@ constexpr auto BARCODE_QUANT_FILE = ".barcodeCount.tsv";
 // constexpr auto HQ_BEADS_FILE            = ".HQbeads.tsv";
 // constexpr auto JACCARD_TMP_FILE         = ".jaccard.csv";
 constexpr auto IMPLICATED_BARCODES_FILE = ".CorrelationBarcodes.tsv.gz";
-constexpr auto TEMP_JACCARD_FILE = ".tempJaccard.tsv";
+constexpr auto TEMP_JACCARD_FILE        = ".tempJaccard.tsv";
 constexpr auto BARCODE_TRANSLATE_FILE   = ".barcodeMerge.tsv";
 // constexpr auto NC_STATS_FILE            = ".NCsumstats.tsv";
 constexpr auto QC_STATS_FILE = ".Metadata.tsv";
@@ -955,7 +955,7 @@ int D2C::determineHQBeads()
 
     // Calculate bead threshold
     fs::path paras_file = output_path / (run_name + PARAM_FILE);
-    
+
     if (barcode_threshold > 0)
     {
         // Use the top N parameter first
@@ -993,14 +993,12 @@ int D2C::determineHQBeads()
                 min_barcode_frags = tmp;
 
                 ofstream ofs(paras_file.string(), std::ofstream::out);
-                ofs.precision(15);
+                // ofs.precision(4);
                 ofs << "bead_cutoff" << FSEP << min_barcode_frags << endl;
                 ofs.close();
             }
         }
     }
-
-    
 
     // Do the filter
     for (auto& p : _total_bead_quant)
@@ -2069,7 +2067,8 @@ double D2C::barcodeRank(string filename, string rank_type, string outfile)
 {
     // Run Rscript to get knee or inflection
     fs::path script_path = bin_path / R_SCRIPT;
-    string command = "Rscript " + script_path.string() + " -i " + filename + " -t " + rank_type + " -o " + outfile + " 2>&1";
+    string   command =
+        "Rscript " + script_path.string() + " -i " + filename + " -t " + rank_type + " -o " + outfile + " 2>&1";
     vector< string > cmd_result;
     int              cmd_rtn = exec_shell(command.c_str(), cmd_result);
     for (const auto& line : cmd_result)
@@ -2084,7 +2083,7 @@ double D2C::barcodeRank(string filename, string rank_type, string outfile)
     }
 
     // Parse result of Rscript
-    double res = 0;
+    double   res = 0;
     ifstream ifs(outfile, std::ifstream::in);
     string   line;
     while (std::getline(ifs, line))

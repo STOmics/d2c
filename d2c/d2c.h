@@ -77,7 +77,6 @@ private:
     bool                   parseTn5List();
     double                 barcodeRank(string filename, string rank_type, string outfile);
 
-
 private:
     // Input parameters
     string   input_bam;

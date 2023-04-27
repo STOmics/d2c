@@ -32,7 +32,7 @@ namespace fs = std::filesystem;
 
 //#define DEVEL
 constexpr auto APP_NAME    = "D2C";
-constexpr auto APP_VERSION = "1.4.7";
+constexpr auto APP_VERSION = "1.5.0";
 
 int main(int argc, char** argv)
 {
@@ -121,9 +121,9 @@ int main(int argc, char** argv)
     bool species_mix = false;
     sub_count->add_flag("--mix-species", species_mix, "Set species mixed, default False");
 
-    string rank = "knee";
+    string rank = "inflection";
     sub_count->add_option("--rank", rank, "Rank method, support knee/inflection/kde, default knee")
-        ->check(CLI::IsMember({"knee", "inflection"}));
+        ->check(CLI::IsMember({ "knee", "inflection" }));
 
     string barcode_runname_list = "";
     // app.add_option("--br", barcode_runname_list, "Barcode runname list file, default

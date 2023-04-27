@@ -1,5 +1,11 @@
 # Change Log
 
+## 1.5.0(2023-04-27)
+
+功能:
+
+* 增加参数 --rank 选择barcode rank算法,目前支持knee 和 inflection,默认inflection; 增加R脚本,环境变量PATH要包含Rscript路径
+
 ## 1.4.7(2023-03-31)
 
 功能:
