@@ -967,10 +967,17 @@ int D2C::determineHQBeads()
         std::sort(cnts.begin(), cnts.end(), std::greater< double >());
         min_barcode_frags =
             barcode_threshold <= static_cast< int >(cnts.size()) ? cnts[barcode_threshold - 1] : cnts.back();
+
+        ofstream ofs(paras_file.string(), std::ofstream::out);
+        ofs << "bead_cutoff" << FSEP << min_barcode_frags << endl;
+        ofs.close();
     }
     else if (min_barcode_frags != 0.0)
     {
         // Use the inflection parameter second
+        ofstream ofs(paras_file.string(), std::ofstream::out);
+        ofs << "bead_cutoff" << FSEP << min_barcode_frags << endl;
+        ofs.close();
     }
     else
     {
@@ -981,6 +988,7 @@ int D2C::determineHQBeads()
             cnts.push_back(b.second);
         }
 
+        // Dump cutoff through Rscript
         min_barcode_frags = barcodeRank(filename.string(), rank, paras_file.string());
 
         if (beads_force != 0)
@@ -1286,10 +1294,18 @@ int D2C::determineBarcodeMerge()
         std::sort(cnts.begin(), cnts.end(), std::greater< double >());
         min_jaccard_index =
             jaccard_threshold <= static_cast< int >(cnts.size()) ? cnts[jaccard_threshold - 1] : cnts.back();
+
+        ofstream ofs(paras_file.string(), std::ofstream::out | std::ofstream::app);
+        ofs << "cor_cutoff" << FSEP << min_jaccard_index << endl;
+        ofs.close();
+        
     }
     else if (min_jaccard_index != 0.0)
     {
         // Use the inflection parameter second
+        ofstream ofs(paras_file.string(), std::ofstream::out | std::ofstream::app);
+        ofs << "cor_cutoff" << FSEP << min_jaccard_index << endl;
+        ofs.close();
     }
     else
     {
