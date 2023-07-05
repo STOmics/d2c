@@ -28,7 +28,7 @@ public:
     ~SamReader();
 
     // DIsable assignment/copy operations.
-    SamReader(const SamReader& other) = delete;
+    SamReader(const SamReader& other)      = delete;
     SamReader& operator=(const SamReader&) = delete;
 
     // Close the underlying resource descriptors.

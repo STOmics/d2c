@@ -487,25 +487,30 @@ int D2C::taskflow()
         }
         ifs.close();
     }
-    auto [S, T] = taskflow.parallel_for(used_chrs.begin(), used_chrs.end(), [&](int chr_id) {
-        Timer t;
-        D2C::splitBamByChr(chr_id);
-        spdlog::info("Split bam by chr: {} time(s): {:.2f}", contigs[chr_id].first, t.toc(1000));
-    });
+    auto [S, T] = taskflow.parallel_for(used_chrs.begin(), used_chrs.end(),
+                                        [&](int chr_id)
+                                        {
+                                            Timer t;
+                                            D2C::splitBamByChr(chr_id);
+                                            spdlog::info("Split bam by chr: {} time(s): {:.2f}", contigs[chr_id].first,
+                                                         t.toc(1000));
+                                        });
 
     S.name("Start SplitBam/Assemble/Annotate");
     T.name("End SplitBam/Assemble/Annotate");
-    S.for_each_successor(
-        [contigs, s = 0](tf::Task successor) mutable { successor.name((contigs.begin() + (s++))->first); });
+    S.for_each_successor([contigs, s = 0](tf::Task successor) mutable
+                         { successor.name((contigs.begin() + (s++))->first); });
 
     // Step 2: determine hight quality beads
     auto determine_hq_beads = taskflow
-                                  .emplace([&]() {
-                                      spdlog::info("SplitBam memory(MB): {}", physical_memory_used_by_process());
-                                      Timer t;
-                                      D2C::determineHQBeads();
-                                      spdlog::info("Determine high-quality beads time(s): {:.2f}", t.toc(1000));
-                                  })
+                                  .emplace(
+                                      [&]()
+                                      {
+                                          spdlog::info("SplitBam memory(MB): {}", physical_memory_used_by_process());
+                                          Timer t;
+                                          D2C::determineHQBeads();
+                                          spdlog::info("Determine high-quality beads time(s): {:.2f}", t.toc(1000));
+                                      })
                                   .name("Determine HQ Beads");
     determine_hq_beads.succeed(T);
 
@@ -516,29 +521,34 @@ int D2C::taskflow()
     // for (int i = 0; i < _bedpes_by_chr.size(); ++i)
     //     if (_bedpes_by_chr[i].size() > 0)
     //         cout<<"has data chr: "<<i<<endl;
-    auto [start_cal, end_cal] = taskflow.parallel_for(used_chrs.begin(), used_chrs.end(), [&](int chr_id) {
-        // Skip the mito chrom
-        if (mito_chrs.count(_contig_names[chr_id]))
-            return;
-        Timer t;
-        D2C::computeStatByChr(chr_id);
-        spdlog::info("Compute stat by chr: {} time(s): {:.2f}", _contig_names[chr_id], t.toc(1000));
-    });
+    auto [start_cal, end_cal] = taskflow.parallel_for(used_chrs.begin(), used_chrs.end(),
+                                                      [&](int chr_id)
+                                                      {
+                                                          // Skip the mito chrom
+                                                          if (mito_chrs.count(_contig_names[chr_id]))
+                                                              return;
+                                                          Timer t;
+                                                          D2C::computeStatByChr(chr_id);
+                                                          spdlog::info("Compute stat by chr: {} time(s): {:.2f}",
+                                                                       _contig_names[chr_id], t.toc(1000));
+                                                      });
     start_cal.name("Start Cal");
     end_cal.name("End Cal");
-    start_cal.for_each_successor(
-        [contigs, s = 0](tf::Task successor) mutable { successor.name((contigs.begin() + (s++))->first); });
+    start_cal.for_each_successor([contigs, s = 0](tf::Task successor) mutable
+                                 { successor.name((contigs.begin() + (s++))->first); });
     start_cal.succeed(determine_hq_beads);
     start_cal.succeed(T);
 
     // Step 4: barcode merge
     auto barcode_merge = taskflow
-                             .emplace([&]() {
-                                 spdlog::info("ComputeByChr memory(MB): {}", physical_memory_used_by_process());
-                                 Timer t;
-                                 D2C::determineBarcodeMerge();
-                                 spdlog::info("Determine barcode merge time(s): {:.2f}", t.toc(1000));
-                             })
+                             .emplace(
+                                 [&]()
+                                 {
+                                     spdlog::info("ComputeByChr memory(MB): {}", physical_memory_used_by_process());
+                                     Timer t;
+                                     D2C::determineBarcodeMerge();
+                                     spdlog::info("Determine barcode merge time(s): {:.2f}", t.toc(1000));
+                                 })
                              .name("Determine Barcode Merge");
     barcode_merge.succeed(end_cal);
     barcode_merge.succeed(determine_hq_beads);
@@ -547,169 +557,186 @@ int D2C::taskflow()
     _keep_qnames.resize(contigs.size());
     _dup_frags.resize(contigs.size());
     _frag_stats.resize(contigs.size());
-    auto [start_reanno, end_reanno] = taskflow.parallel_for(used_chrs.begin(), used_chrs.end(), [&](int chr_id) {
-        Timer t;
-        D2C::reannotateFragByChr(chr_id);
-        spdlog::info("Reannotate frags by chr: {} time(s): {:.2f}", _contig_names[chr_id], t.toc(1000));
-    });
+    auto [start_reanno, end_reanno] = taskflow.parallel_for(
+        used_chrs.begin(), used_chrs.end(),
+        [&](int chr_id)
+        {
+            Timer t;
+            D2C::reannotateFragByChr(chr_id);
+            spdlog::info("Reannotate frags by chr: {} time(s): {:.2f}", _contig_names[chr_id], t.toc(1000));
+        });
     start_reanno.name("Start Reannotate");
     end_reanno.name("End Reannotate");
-    start_reanno.for_each_successor(
-        [contigs, s = 0](tf::Task successor) mutable { successor.name((contigs.begin() + (s++))->first); });
+    start_reanno.for_each_successor([contigs, s = 0](tf::Task successor) mutable
+                                    { successor.name((contigs.begin() + (s++))->first); });
     start_reanno.succeed(barcode_merge);
     start_reanno.succeed(T);
 
     // Step 5.1: sequencing saturation
     auto sequence_saturation = taskflow
-                                   .emplace([&]() {
-                                       if (saturation_on)
+                                   .emplace(
+                                       [&]()
                                        {
-                                           Timer    t;
-                                           fs::path sat_out_file = output_path / (run_name + SAT_FILE);
-                                           saturation.calculateSaturation(sat_out_file.string());
-                                           spdlog::info("Sequencing saturation time(s): {:.2f}", t.toc(1000));
-                                       }
-                                   })
+                                           if (saturation_on)
+                                           {
+                                               Timer    t;
+                                               fs::path sat_out_file = output_path / (run_name + SAT_FILE);
+                                               saturation.calculateSaturation(sat_out_file.string());
+                                               spdlog::info("Sequencing saturation time(s): {:.2f}", t.toc(1000));
+                                           }
+                                       })
                                    .name("Sequence saturation");
     sequence_saturation.succeed(end_reanno);
 
     // Step 6: annotate bam file by chr
-    auto [start_annobam, end_annobam] = taskflow.parallel_for(used_chrs.begin(), used_chrs.end(), [&](int chr_id) {
-        // Skip the mito chrom
-        // if (_contig_names[chr_id] == mito_chr)
-        //    return;
-        if (_is_bed)
-            return;
+    auto [start_annobam, end_annobam] = taskflow.parallel_for(
+        used_chrs.begin(), used_chrs.end(),
+        [&](int chr_id)
+        {
+            // Skip the mito chrom
+            // if (_contig_names[chr_id] == mito_chr)
+            //    return;
+            if (_is_bed)
+                return;
 
-        Timer t;
-        D2C::annotateBamByChr(chr_id);
-        spdlog::info("Annotate bam file by chr: {} time(s): {:.2f}", _contig_names[chr_id], t.toc(1000));
-    });
+            Timer t;
+            D2C::annotateBamByChr(chr_id);
+            spdlog::info("Annotate bam file by chr: {} time(s): {:.2f}", _contig_names[chr_id], t.toc(1000));
+        });
     start_annobam.name("Start Annotate bam");
     end_annobam.name("End Annotate bam");
-    start_annobam.for_each_successor(
-        [contigs, s = 0](tf::Task successor) mutable { successor.name((contigs.begin() + (s++))->first); });
+    start_annobam.for_each_successor([contigs, s = 0](tf::Task successor) mutable
+                                     { successor.name((contigs.begin() + (s++))->first); });
     start_annobam.succeed(end_reanno);
     start_annobam.succeed(T);
 
     // Step 7: merge bam files
     auto merge_bam = taskflow
-                         .emplace([&]() {
-                             if (_is_bed)
-                                 return;
+                         .emplace(
+                             [&]()
+                             {
+                                 if (_is_bed)
+                                     return;
 
-                             Timer t;
-                             spdlog::debug("Merge bam");
-                             std::vector< std::string > bam_files;
-                             for (auto& chr_id : used_chrs)
-                             {
-                                 // Skip the mito chrom
-                                 // if (_contig_names[chr_id] == mito_chr)
-                                 //    continue;
-                                 fs::path tmp_bam_file = temp_bam_path / (contigs[chr_id].first + ".bam");
-                                 if (fs::exists(tmp_bam_file))
-                                     bam_files.push_back(tmp_bam_file.string());
-                             }
-                             fs::path output_bam_file = output_path / (run_name + ".bam");
-                             spdlog::info("Be merged file size: {}", bam_files.size());
-                             // for (auto& name : bam_files)
-                             //     spdlog::debug("merge bam: {}", name);
-                             try
-                             {
-                                 int cmd_rtn = bam_cat(bam_files, nullptr, output_bam_file.c_str(), nullptr, 0);
-                                 if (cmd_rtn == 0)
+                                 Timer t;
+                                 spdlog::debug("Merge bam");
+                                 std::vector< std::string > bam_files;
+                                 for (auto& chr_id : used_chrs)
                                  {
-                                     spdlog::info("Merge bam file success");
-                                     // Build index file
-                                     Timer index_timer;
-                                     auto  bai_file(output_bam_file);
-                                     bai_file += ".bai";
-                                     if (fs::exists(bai_file))
-                                         fs::remove(bai_file);
-                                     auto samReader = SamReader::FromFile(output_bam_file);
-                                     spdlog::info("Build bam index time(s): {:.2f}", index_timer.toc(1000));
+                                     // Skip the mito chrom
+                                     // if (_contig_names[chr_id] == mito_chr)
+                                     //    continue;
+                                     fs::path tmp_bam_file = temp_bam_path / (contigs[chr_id].first + ".bam");
+                                     if (fs::exists(tmp_bam_file))
+                                         bam_files.push_back(tmp_bam_file.string());
                                  }
-                                 else
-                                     spdlog::error("Merge bam file fail, rtn:{}", cmd_rtn);
-                             }
-                             catch (std::exception& e)
-                             {
-                                 spdlog::error("Error in merge bam: {}", e.what());
-                             }
-                             catch (...)
-                             {
-                                 spdlog::error("Error in merge bam");
-                             }
-                             spdlog::info("Merge bam time(s): {:.2f}", t.toc(1000));
-                         })
+                                 fs::path output_bam_file = output_path / (run_name + ".bam");
+                                 spdlog::info("Be merged file size: {}", bam_files.size());
+                                 // for (auto& name : bam_files)
+                                 //     spdlog::debug("merge bam: {}", name);
+                                 try
+                                 {
+                                     int cmd_rtn = bam_cat(bam_files, nullptr, output_bam_file.c_str(), nullptr, 0);
+                                     if (cmd_rtn == 0)
+                                     {
+                                         spdlog::info("Merge bam file success");
+                                         // Build index file
+                                         Timer index_timer;
+                                         auto  bai_file(output_bam_file);
+                                         bai_file += ".bai";
+                                         if (fs::exists(bai_file))
+                                             fs::remove(bai_file);
+                                         auto samReader = SamReader::FromFile(output_bam_file);
+                                         spdlog::info("Build bam index time(s): {:.2f}", index_timer.toc(1000));
+                                     }
+                                     else
+                                         spdlog::error("Merge bam file fail, rtn:{}", cmd_rtn);
+                                 }
+                                 catch (std::exception& e)
+                                 {
+                                     spdlog::error("Error in merge bam: {}", e.what());
+                                 }
+                                 catch (...)
+                                 {
+                                     spdlog::error("Error in merge bam");
+                                 }
+                                 spdlog::info("Merge bam time(s): {:.2f}", t.toc(1000));
+                             })
                          .name("Merge bam");
     merge_bam.succeed(end_annobam);
 
     // Step 8: merge fragment files
     auto merge_frags = taskflow
-                           .emplace([&]() {
-                               spdlog::info("Reannotate frags memory(MB): {}", physical_memory_used_by_process());
-                               spdlog::debug("Merge frags");
-                               Timer t;
-                               for (auto& chr_id : used_chrs)
+                           .emplace(
+                               [&]()
                                {
-                                   // Skip the mito chrom
-                                   // if (_contig_names[chr_id] == mito_chr)
-                                   //    continue;
-                                   // spdlog::debug("final frags size: {} dup frags size: {} {}", _final_frags.size(),
-                                   // chr_id, _dup_frags[chr_id].size()); _final_frags.insert(_final_frags.end(),
-                                   // _dup_frags[chr_id].begin(), _dup_frags[chr_id].end());
-                                   for (auto& frag : _dup_frags[chr_id])
+                                   spdlog::info("Reannotate frags memory(MB): {}", physical_memory_used_by_process());
+                                   spdlog::debug("Merge frags");
+                                   Timer t;
+                                   for (auto& chr_id : used_chrs)
                                    {
-                                       // spdlog::debug("frag: {} {} {} {}", frag.start, frag.end, frag.chr_id,
-                                       // frag.barcode_id);
-                                       _final_frags.push_back(std::move(frag));
+                                       // Skip the mito chrom
+                                       // if (_contig_names[chr_id] == mito_chr)
+                                       //    continue;
+                                       // spdlog::debug("final frags size: {} dup frags size: {} {}",
+                                       // _final_frags.size(), chr_id, _dup_frags[chr_id].size());
+                                       // _final_frags.insert(_final_frags.end(), _dup_frags[chr_id].begin(),
+                                       // _dup_frags[chr_id].end());
+                                       for (auto& frag : _dup_frags[chr_id])
+                                       {
+                                           // spdlog::debug("frag: {} {} {} {}", frag.start, frag.end, frag.chr_id,
+                                           // frag.barcode_id);
+                                           _final_frags.push_back(std::move(frag));
+                                       }
+                                       _dup_frags[chr_id].clear();
+                                       _dup_frags[chr_id].shrink_to_fit();
                                    }
-                                   _dup_frags[chr_id].clear();
-                                   _dup_frags[chr_id].shrink_to_fit();
-                               }
-                               spdlog::debug("Final frags size: {}", _final_frags.size());
+                                   spdlog::debug("Final frags size: {}", _final_frags.size());
 
-                               fs::path out_frag_file = output_path / (run_name + FRAGMENT_FILE);
-                               spdlog::debug("Dump frags to: {}", out_frag_file.string());
-                               BGZF* out_frag;
-                               out_frag = bgzf_open(out_frag_file.c_str(), "w");
-                               for (auto& l : _final_frags)
-                               {
-                                   // Standardized format output, insert one column data
-                                   string s = _contig_names[l.chr_id] + "\t" + to_string(l.start) + "\t"
-                                              + to_string(l.end) + "\t" + _idx2drop[l.barcode_id] + "\t1\n";
-                                   // spdlog::debug(s);
-                                   [[maybe_unused]] auto ret = bgzf_write(out_frag, s.c_str(), s.size());
-                               }
-                               bgzf_close(out_frag);
-                               spdlog::info("Merge frags time(s): {:.2f}", t.toc(1000));
+                                   fs::path out_frag_file = output_path / (run_name + FRAGMENT_FILE);
+                                   spdlog::debug("Dump frags to: {}", out_frag_file.string());
+                                   BGZF* out_frag;
+                                   out_frag = bgzf_open(out_frag_file.c_str(), "w");
+                                   for (auto& l : _final_frags)
+                                   {
+                                       // Standardized format output, insert one column data
+                                       string s = _contig_names[l.chr_id] + "\t" + to_string(l.start) + "\t"
+                                                  + to_string(l.end) + "\t" + _idx2drop[l.barcode_id] + "\t1\n";
+                                       // spdlog::debug(s);
+                                       [[maybe_unused]] auto ret = bgzf_write(out_frag, s.c_str(), s.size());
+                                   }
+                                   bgzf_close(out_frag);
+                                   spdlog::info("Merge frags time(s): {:.2f}", t.toc(1000));
 
-                               if (tbx_index_build(out_frag_file.c_str(), 0, &tbx_conf_bed))
-                                   spdlog::warn("Failed build frags index");
-                               else
-                                   spdlog::info("Build frags index time(s): {:.2f}", t.toc(1000));
-                           })
+                                   if (tbx_index_build(out_frag_file.c_str(), 0, &tbx_conf_bed))
+                                       spdlog::warn("Failed build frags index");
+                                   else
+                                       spdlog::info("Build frags index time(s): {:.2f}", t.toc(1000));
+                               })
                            .name("Merge fragments");
     merge_frags.succeed(end_reanno);
 
     // Step 9: simple qc
     auto simple_qc = taskflow
-                         .emplace([&]() {
-                             Timer t;
-                             D2C::simpleQC(used_chrs);
-                             spdlog::info("Simple qc time(s): {:.2f}", t.toc(1000));
-                         })
+                         .emplace(
+                             [&]()
+                             {
+                                 Timer t;
+                                 D2C::simpleQC(used_chrs);
+                                 spdlog::info("Simple qc time(s): {:.2f}", t.toc(1000));
+                             })
                          .name("Simple qc");
     simple_qc.succeed(end_reanno);
 
     // Step 10: final qc
     auto final_qc = taskflow
-                        .emplace([&]() {
-                            Timer t;
-                            D2C::finalQC();
-                            spdlog::info("Final qc time(s): {:.2f}", t.toc(1000));
-                        })
+                        .emplace(
+                            [&]()
+                            {
+                                Timer t;
+                                D2C::finalQC();
+                                spdlog::info("Final qc time(s): {:.2f}", t.toc(1000));
+                            })
                         .name("Final qc");
     final_qc.succeed(barcode_merge);
     final_qc.succeed(simple_qc);
@@ -717,11 +744,13 @@ int D2C::taskflow()
 
     // Step 11: plot
     auto plot = taskflow
-                    .emplace([&]() {
-                        Timer t;
-                        D2C::plot();
-                        spdlog::info("Plot time(s): {:.2f}", t.toc(1000));
-                    })
+                    .emplace(
+                        [&]()
+                        {
+                            Timer t;
+                            D2C::plot();
+                            spdlog::info("Plot time(s): {:.2f}", t.toc(1000));
+                        })
                     .name("Plot");
     plot.succeed(barcode_merge);
     plot.succeed(determine_hq_beads);
@@ -1298,7 +1327,6 @@ int D2C::determineBarcodeMerge()
         ofstream ofs(paras_file.string(), std::ofstream::out | std::ofstream::app);
         ofs << "cor_cutoff" << FSEP << min_jaccard_index << endl;
         ofs.close();
-        
     }
     else if (min_jaccard_index != 0.0)
     {

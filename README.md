@@ -4,6 +4,31 @@
 
 ## 环境
 
+### 编译环境
+
+* centos-7.0+
+* gcc-9.1.0
+* cmake-3.17.2
+* python3
+
+C++依赖库:
+
+| Library    | Version | Description                        | Link                                                                          |
+| ---------- | ------- | ---------------------------------- | ----------------------------------------------------------------------------- |
+| htslib     | 1.14.0  | process bam/sam data               | https://github.com/samtools/htslib/releases/download/1.14/htslib-1.14.tar.bz2 |
+| spdlog     | 1.5.0   | logging module                     | https://github.com/gabime/spdlog/archive/v1.5.0.zip                           |
+| CLI11      | 1.9.0   | parse command line parameters      | https://github.com/CLIUtils/CLI11/releases/download/v1.9.0/CLI11.hpp          |
+| libdeflate | 1.5     | accelerate bgzf IO                 | https://github.com/ebiggers/libdeflate/archive/v1.5.zip                       |
+| ygg        | master  | interval tree for find overlapping | https://github.com/tinloaf/ygg.git commit:119c21c                             |
+| taskflow   | 2.5.0   | workflow of tasks                  | https://github.com/taskflow/taskflow                                          |
+| sparsepp   | master  | a fast, memory efficient hash map  | https://github.com/greg7mdp/sparsepp                                          |
+
+编译步骤:
+
+1. 安装好环境和依赖库
+2. 修改 script/build.sh 中 libPath 为正确路径
+3. 运行 script/build.sh, 结果存放在 install 目录
+
 ### 运行环境
 
 * centos 7.0+
@@ -12,11 +37,11 @@
 
 ### 脚本设置
 
-需引入gcc动态库和python的可执行文件路径,形式如下:
+需引入gcc动态库和python的可执行文件路径,形式如下,需正确设置变量 ${libPath}:
 
 ```sh
-export LD_LIBRARY_PATH="/hwfssz5/ST_BIGDATA/USER/zhaofuxiang/lib/gcc-9.1.0/lib:/hwfssz5/ST_BIGDATA/USER/zhaofuxiang/lib/gcc-9.1.0/lib64:$LD_LIBRARY_PATH"
-export PATH="/ldfssz1/ST_BIGDATA/PMO/SOFTWARE/Python-3/bin:$PATH"
+export LD_LIBRARY_PATH="${libPath}/gcc-9.1.0/lib:${libPath}/gcc-9.1.0/lib64:$LD_LIBRARY_PATH"
+export PATH="${libPath}/Python-3/bin:$PATH"
 ```
 
 ## 输入/输出
@@ -139,10 +164,3 @@ D2C version: 1.3.1
 
 * 程序为了降低内存,对部分数据进行了编码处理,目前版本可支持的单染色体数据大小(即单条染色体在bam文件中的reads个数)需不超过2147483648,否则可能出现结果异常
 * 默认使用设计好的1536个barcodes组合,如需修改,请使用输入参数 *-b*
-
-## TODO
-
-性能:
-
-* 降低大数据量的内存消耗
-* 提高程序运行速度

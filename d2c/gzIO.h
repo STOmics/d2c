@@ -10,7 +10,7 @@
 #pragma once
 
 #include <zlib.h>
-//#include <gzguts.h>
+// #include <gzguts.h>
 
 #define cmpFile gzFile
 #define cmpOpen(x) gzopen(x, "wb")

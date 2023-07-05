@@ -1,6 +1,6 @@
 
 # TODO: change the libPath to your specific path
-libPath="/ldfssz1/ST_BIOINTEL/P20Z10200N0039/zhaofuxiang/lib"
+libPath=""
 
 cmakePath="$libPath/cmake-3.17.2"
 gccPath="$libPath/gcc-9.1.0"
@@ -9,31 +9,23 @@ spdlogPath="$libPath/spdlog-1.5.0"
 libdeflatePath="$libPath/libdeflate-1.5"
 htslibPath="$libPath/htslib-1.9"
 yggPath="$libPath/ygg-master"
-doctestPath="$libPath/doctest-2.3.7"
 taskflowPath="$libPath/taskflow-2.5.0"
-fftwPath="$libPath/fftw-3.3.8"
 sparseppPath="$libPath/sparsepp"
 py="$libPath/python3.6/bin/python"
 
 binPath="/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/bin"
 export PATH="$gccPath/bin:$cmakePath/bin:$binPath"
-#echo $PATH
 
-export LD_LIBRARY_PATH="$fftwPath/lib:$LD_LIBRARY_PATH"
 export LD_LIBRARY_PATH="$libdeflatePath/lib:$htslibPath/lib:$gccPath/lib64:$LD_LIBRARY_PATH"
 export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/lib64"
 export LIBRARY_PATH=$LD_LIBRARY_PATH
-# echo $LD_LIBRARY_PATH
 
 export C_INCLUDE_PATH="$sparseppPath/include:$C_INCLUDE_PATH"
-export C_INCLUDE_PATH="$fftwPath/include:$C_INCLUDE_PATH"
-export C_INCLUDE_PATH="$doctestPath/include:$C_INCLUDE_PATH"
 export C_INCLUDE_PATH="$libdeflatePath/include:$yggPath/include:$C_INCLUDE_PATH"
 export C_INCLUDE_PATH="$htslibPath/include:$gccPath/include:$C_INCLUDE_PATH"
 export C_INCLUDE_PATH="$CLI11Path/include:$spdlogPath/include:$C_INCLUDE_PATH"
 export C_INCLUDE_PATH="$taskflowPath/include:$C_INCLUDE_PATH"
 export CPLUS_INCLUDE_PATH=$C_INCLUDE_PATH
-#echo $C_INCLUDE_PATH
 
 export CC="$gccPath/bin/gcc"
 export CXX="$gccPath/bin/g++"
@@ -50,11 +42,9 @@ absPath(){
     echo "$ap"
 }
 
-#srcPath=/hwfssz1/ST_BIGDATA/USER/zhaofuxiang/git/handle_bam
 srcPath="$(cd $(dirname $(dirname $0)); pwd)"
 buildPath="$(mktemp -d -p /dev/shm $(basename $srcPath).XXXXXXXXXX)"
 
-#echo $buildPath
 buildPath="$(absPath $buildPath)"
 if [ -e "$buildPath" ]
 then
@@ -63,14 +53,11 @@ fi
 mkdir -p $buildPath
 
 cd $buildPath
-#echo $buildPath
 
 installPath="$buildPath/install"
 mkdir -p $installPath/bin $installPath/lib
 
 timeStart=$(date +%s)
-#cmake -DCMAKE_CXX_COMPILER=$gccPath/bin/c++ $srcPath
-#make clean
 test="OFF"
 if [ $# == 1 ]
 then

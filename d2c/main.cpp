@@ -30,7 +30,7 @@ namespace fs = std::filesystem;
 
 #include "timer.h"
 
-//#define DEVEL
+// #define DEVEL
 constexpr auto APP_NAME    = "D2C";
 constexpr auto APP_VERSION = "1.5.1";
 

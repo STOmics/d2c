@@ -33,7 +33,3 @@ bam文件添加tags,增加一列DB数据
 insert size的均值,中值,与tss区域有overlap的比率,frip,dup率,library size等,输出统计文件
 
 绘图包括barcode/jaccard的阈值等
-
-## workflow
-
-![流程图](workflow.png)
