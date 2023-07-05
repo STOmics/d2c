@@ -67,7 +67,7 @@ then
     fi
 fi
 
-cmake $srcPath -DINSTALL_PATH=$installPath -DUNITTEST=$test -DCMAKE_INSTALL_PREFIX=$installPath
+cmake $srcPath -DINSTALL_PATH=$installPath -DCMAKE_INSTALL_PREFIX=$installPath
 
 thread=$(grep -c ^processor /proc/cpuinfo)
 make -j $thread install #VERBOSE=1
